@@ -1,0 +1,15 @@
+std_msgs/Header header
+int32 drone_id
+
+uint32 command_count
+float64 command_rate_hz
+float64 command_max_gap_ms
+uint32 command_gaps_over_50ms
+uint32 command_gaps_over_200ms
+
+uint32 trajectory_received
+uint32 trajectory_dropped_old
+uint32 trajectory_completed
+
+float64 tracking_error_position_m
+float64 tracking_error_yaw_rad

@@ -1,0 +1,16 @@
+cameras:
+  - type: pinhole
+    intrinsics: [387.229, 387.229, 321.046, 243.449]
+    resolution: [640, 480]
+    camToImu:
+      - [0.0, 0.0, 1.0, 0.0]
+      - [-1.0, 0.0, 0.0, 0.0]
+      - [0.0, -1.0, 0.0, 0.0]
+      - [0.0, 0.0, 0.0, 1.0]
+imu:
+  rate: 200.0
+  timeOffsetNs: 0
+  accelNoiseStd: [0.016, 0.016, 0.016]
+  gyroNoiseStd: [0.000282, 0.000282, 0.000282]
+  accelBiasStd: [0.001, 0.001, 0.001]
+  gyroBiasStd: [0.0001, 0.0001, 0.0001]

@@ -1,0 +1,27 @@
+lio:
+  lidarType: generic
+  scanLine: 16
+  scanRate: 10
+  pointFilterNum: 1
+  timestampUnit: 0
+  blind: 0.2
+
+  maxIterations: 4
+  filterSizeSurf: 0.3
+  filterSizeMap: 0.3
+  cubeSideLength: 50.0
+  detRange: 20.0
+  fovDegree: 180.0
+
+  accCov: 0.1
+  gyrCov: 0.1
+  biasAccCov: 0.0001
+  biasGyrCov: 0.0001
+  extrinsicEstimate: false
+  extrinsicT: [0.0, 0.0, 0.0]
+  extrinsicR: [1.0, 0.0, 0.0,
+               0.0, 1.0, 0.0,
+               0.0, 0.0, 1.0]
+
+  timeSyncEnable: false
+  timeOffsetLidarToImu: 0.0

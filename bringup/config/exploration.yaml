@@ -1,0 +1,204 @@
+exploration_node:
+  ros__parameters:
+    sdfmap:
+      xlen: 35.0
+      ylen: 35.0
+      zlen: 3.5
+      groundHeight: -1.0
+      resolution: 0.1
+      inflation: 0.199
+      maxRayLength: 4.5
+      phit: 0.65
+      pmiss: 0.35
+      pmin: 0.12
+      pmax: 0.90
+      pocc: 0.80
+      boxMinX: -7.0
+      boxMinY: -15.0
+      boxMinZ: 0.0
+      boxMaxX: 7.0
+      boxMaxY: 15.0
+      boxMaxZ: 1.7
+    sensor:
+      fx: 387.229
+      fy: 387.229
+      cx: 321.046
+      cy: 243.449
+      minDepth: 0.2
+      maxDepth: 4.6
+      margin: 2
+      scalingFactor: 1000.0
+      skipPixel: 2
+    frontier:
+      clusterMin: 100
+      clusterSizeXY: 2.0
+      clusterSizeZ: 10.0
+      minCandidateDist: 0.5
+      minCandidateClearance: 0.21
+      candidateDphi: 0.261799
+      candidateRnum: 3
+      candidateRmin: 1.0
+      candidateRmax: 1.5
+      downSample: 3
+      minVisibleNum: 30
+      minViewFinishFraction: 0.2
+      minFrontierZ: 0.2
+    grid:
+      gridSize: 5.0
+      minUnknown: 4000
+      minFree: 3000
+      consistentCost: -5.0
+      consistentCost2: 8.0
+    exploration:
+      refineLocal: true
+      refinedNum: 7
+      refinedRadius: 5.0
+      topViewNum: 15
+      maxDecay: 0.8
+      droneId: 1
+      droneNum: 1
+      initPlanNum: 2
+      relaxTime: 0.3
+      replanTime: 0.2
+      radiusFar: 7.0
+      radiusClose: 1.5
+      shortenDist: 3.0
+      planRetryBaseDelay: 0.1
+      planRetryMaxDelay: 0.5
+      planRetryBackoffFactor: 2.0
+      planRefreshAfterFailures: 3
+      planTrajectory: true
+      finishUnreachableFrontier: false
+      autoTrigger: true
+    fsm:
+      initWaitDuration: 2.0
+      replanThresh1: 0.2
+      replanThresh2: 0.2
+      replanThresh3: 1.5
+      idleDuration: 100.0
+    astar:
+      resolution: 0.3
+      lambdaHeu: 1.0
+      maxSearchTime: 1.0
+      collisionCheckStep: 0.1
+      maxNodes: 1000000
+    astarView:
+      resolution: 0.3
+      lambdaHeu: 10000.0
+      maxSearchTime: 0.001
+      collisionCheckStep: 0.1
+      maxNodes: 1000000
+    viewpoint:
+      vm: 1.5
+      am: 1.0
+      yd: 1.396263
+      ydd: 1.570796
+      wDir: 1.5
+      noPathPenaltyFactor: 10.0
+      minNoPathPenaltyLength: 100.0
+      noPathPenaltyLength: 100.0
+    planner:
+      controlPointDistance: 0.5
+      maxYawRate: 2.0944
+      relaxTime2: 1.5
+      minTime: true
+      optimistic: true
+      collisionCheckRadius: 6.0
+      collisionCheckStep: 0.02
+      swarmSafeDistance: 0.5
+    kino:
+      resolution: 0.1
+      maxTau: 0.8
+      initMaxTau: 1.0
+      maxVel: 1.5
+      velMargin: 0.25
+      maxAcc: 1.0
+      timeWeight: 10.0
+      horizon: 5.0
+      lambdaHeu: 10.0
+      collisionCheckStep: 0.1
+      maxSearchTime: 1.0
+      pathSampleInterval: 0.01
+      maxNodes: 100000
+    yaw:
+      smoothWeight: 5.0
+      startWeight: 100.0
+      endWeight: 0.5
+      waypointWeight: 7.0
+      startPositionWeight: 10.0
+      maxEval: 2000
+      maxTime: 0.005
+      xtolRel: 1.0e-5
+    tsp:
+      workDir: /tmp/arc_exploration_1
+    mapchunk:
+      chunkSize: 200
+      minStampInterval: 0.3
+    swarm:
+      droneStateInterval: 0.04
+      optInterval: 0.2
+      attemptInterval: 0.3
+      pairOptInterval: 1.0
+      stateTimeout: 0.2
+      responseTimeout: 1.0
+      costMargin: 0.1
+      repeatSendNum: 10
+    diagnostics:
+      enabled: true
+      publishInterval: 1.0
+      eventQueueSize: 1000
+
+pcl_render_node:
+  ros__parameters:
+    cam_width: 640
+    cam_height: 480
+    cam_fx: 387.229
+    cam_fy: 387.229
+    cam_cx: 321.046
+    cam_cy: 243.449
+    sensing_horizon: 5.0
+    sensing_rate: 10.0
+    image_rate: 20.0
+    estimation_rate: 10.0
+    texture_scale: 5.0
+
+odom_pub:
+  ros__parameters:
+    drone_id: 1
+    init_x: 0.0
+    init_y: 0.0
+    init_z: 1.0
+    publish_rate: 100.0
+    imu_rate: 200.0
+    imu_accel_noise_std: [0.0, 0.0, 0.0]
+    imu_gyro_noise_std: [0.0, 0.0, 0.0]
+    imu_accel_bias: [0.0, 0.0, 0.0]
+    imu_gyro_bias: [0.0, 0.0, 0.0]
+
+odom_visualization:
+  ros__parameters:
+    drone_id: 1
+    drone_num: 1
+    robot_scale: 1.0
+    mesh_resource: package://arc_sim/resource/meshes/hummingbird.mesh
+
+dronevisual_pub:
+  ros__parameters:
+    drone_id: 1
+    drone_num: 1
+    robot_scale: 1.0
+    mesh_resource: package://arc_sim/resource/meshes/hummingbird.mesh
+
+lidar_render_node:
+  ros__parameters:
+    drone_id: 1
+    lidar_rate: 10.0
+    lidar_rings: 16
+    lidar_azimuth_samples: 900
+    lidar_vertical_min_deg: -15.0
+    lidar_vertical_max_deg: 15.0
+    lidar_min_range: 0.2
+    lidar_max_range: 15.0
+    range_noise_std: 0.01
+    motion_distortion: true
+    lidar_frame: lidar

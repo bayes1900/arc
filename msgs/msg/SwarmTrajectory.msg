@@ -1,0 +1,9 @@
+int32 drone_id
+int64 traj_id
+float64 start_time
+int32 order
+float64 interval
+geometry_msgs/Point[] control_points
+int32 yaw_order
+float64 yaw_interval
+float64[] yaw_control_points
