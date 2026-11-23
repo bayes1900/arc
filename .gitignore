@@ -16,5 +16,6 @@ dist
 
 .local/
 /doc/
+/map/
 /sim/stats/
 /scripts/smoke_test*.sh
