@@ -46,15 +46,16 @@ public:
         }
     }
 
-    void addLidar(const LidarFrame& frame) {
+    void addLidar(LidarFrame frame) {
         {
             std::lock_guard<std::mutex> lock(mutex_);
             if (!lidarBuffer_.empty() && frame.stamp < lastLidarStamp_) {
                 std::cerr << "[lio] lidar loop back, clear buffer" << std::endl;
                 lidarBuffer_.clear();
             }
-            lidarBuffer_.push_back(frame);
-            lastLidarStamp_ = frame.stamp;
+            const double stamp = frame.stamp;
+            lidarBuffer_.push_back(std::move(frame));
+            lastLidarStamp_ = stamp;
             while (lidarBuffer_.size() > MAX_LIDAR_BUFFER) {
                 lidarBuffer_.pop_front();
             }
@@ -101,7 +102,7 @@ private:
                     return;
                 }
 
-                frame = lidarBuffer_.front();
+                frame = std::move(lidarBuffer_.front());
                 condition_.wait(lock, [this, endTime = frame.endTime]() {
                     return !running_ || (!imuBuffer_.empty() && imuBuffer_.back().time >= endTime);
                 });

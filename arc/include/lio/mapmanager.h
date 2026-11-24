@@ -91,8 +91,6 @@ public:
         LioPointVector& nearest,
         std::vector<float>& squaredDistances
     ) {
-        nearest.clear();
-        squaredDistances.clear();
         tree_->nearestSearch(point, k, nearest, squaredDistances);
         return static_cast<int>(nearest.size());
     }

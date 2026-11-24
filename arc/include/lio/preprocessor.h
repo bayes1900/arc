@@ -76,7 +76,6 @@ private:
             }
             const int layer = point.ring;
             const double yaw = std::atan2(point.y, point.x) * 57.2957;
-
             float pointTime = 0.0f;
             if (isFirst[static_cast<size_t>(layer)]) {
                 yawFirst[static_cast<size_t>(layer)] = yaw;
@@ -84,7 +83,6 @@ private:
                 isFirst[static_cast<size_t>(layer)] = false;
                 continue;
             }
-
             if (yaw <= yawFirst[static_cast<size_t>(layer)]) {
                 pointTime = static_cast<float>((yawFirst[static_cast<size_t>(layer)] - yaw) / omega);
             } else {
@@ -101,7 +99,6 @@ private:
             if (!validRange_(point)) {
                 continue;
             }
-
             LioPoint added;
             added.x = point.x;
             added.y = point.y;

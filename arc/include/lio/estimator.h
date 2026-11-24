@@ -79,7 +79,7 @@ public:
         normvec_->resize(static_cast<size_t>(featsDownSize_));
         featsDownWorld_->resize(static_cast<size_t>(featsDownSize_));
         nearestPoints_.resize(static_cast<size_t>(featsDownSize_));
-        pointSelectedSurf_.resize(static_cast<size_t>(featsDownSize_), false);
+        pointSelectedSurf_.resize(static_cast<size_t>(featsDownSize_), 0);
         resLast_.resize(static_cast<size_t>(featsDownSize_), 0.0f);
 
         double solveTime = 0.0;
@@ -150,50 +150,55 @@ private:
         totalResidual_ = 0.0;
 
 #ifdef _OPENMP
-#pragma omp parallel for
+#pragma omp parallel
 #endif
-        for (int i = 0; i < featsDownSize_; ++ i) {
-            LioPoint& pointBody = featsDownBody_->points[static_cast<size_t>(i)];
-            LioPoint& pointWorld = featsDownWorld_->points[static_cast<size_t>(i)];
-
-            const Vec3d pBody(pointBody.x, pointBody.y, pointBody.z);
-            const Vec3d pGlobal = state.rot * (state.offsetRLI * pBody + state.offsetTLI) + state.pos;
-            pointWorld.x = static_cast<float>(pGlobal.x());
-            pointWorld.y = static_cast<float>(pGlobal.y());
-            pointWorld.z = static_cast<float>(pGlobal.z());
-            pointWorld.intensity = pointBody.intensity;
-
+        {
             std::vector<float> pointSearchSqDis(kNumMatchPoints);
-            LioPointVector& pointsNear = nearestPoints_[static_cast<size_t>(i)];
-            pointsNear.clear();
+#ifdef _OPENMP
+#pragma omp for
+#endif
+            for (int i = 0; i < featsDownSize_; ++ i) {
+                LioPoint& pointBody = featsDownBody_->points[static_cast<size_t>(i)];
+                LioPoint& pointWorld = featsDownWorld_->points[static_cast<size_t>(i)];
 
-            if (ekfomData.converge) {
-                map_.nearestSearch(pointWorld, kNumMatchPoints, pointsNear, pointSearchSqDis);
-                pointSelectedSurf_[static_cast<size_t>(i)] = pointsNear.size() < kNumMatchPoints
-                    ? false
-                    : pointSearchSqDis[kNumMatchPoints - 1] > 5.0f ? false : true;
-            }
+                const Vec3d pBody(pointBody.x, pointBody.y, pointBody.z);
+                const Vec3d pGlobal = state.rot * (state.offsetRLI * pBody + state.offsetTLI) + state.pos;
+                pointWorld.x = static_cast<float>(pGlobal.x());
+                pointWorld.y = static_cast<float>(pGlobal.y());
+                pointWorld.z = static_cast<float>(pGlobal.z());
+                pointWorld.intensity = pointBody.intensity;
 
-            if (!pointSelectedSurf_[static_cast<size_t>(i)]) {
-                continue;
-            }
+                LioPointVector& pointsNear = nearestPoints_[static_cast<size_t>(i)];
+                pointsNear.clear();
 
-            Eigen::Matrix<float, 4, 1> plane;
-            pointSelectedSurf_[static_cast<size_t>(i)] = false;
-            if (estiPlane<float>(plane, pointsNear, 0.1f)) {
-                const float pd2 = plane(0) * pointWorld.x
-                    + plane(1) * pointWorld.y
-                    + plane(2) * pointWorld.z
-                    + plane(3);
-                const float score = 1.0f - 0.9f * std::fabs(pd2) / std::sqrt(pBody.norm());
-                if (score > 0.9f) {
-                    pointSelectedSurf_[static_cast<size_t>(i)] = true;
-                    LioPoint& normal = normvec_->points[static_cast<size_t>(i)];
-                    normal.x = plane(0);
-                    normal.y = plane(1);
-                    normal.z = plane(2);
-                    normal.intensity = pd2;
-                    resLast_[static_cast<size_t>(i)] = std::fabs(pd2);
+                if (ekfomData.converge) {
+                    map_.nearestSearch(pointWorld, kNumMatchPoints, pointsNear, pointSearchSqDis);
+                    pointSelectedSurf_[static_cast<size_t>(i)] = pointsNear.size() < kNumMatchPoints
+                        ? false
+                        : pointSearchSqDis[kNumMatchPoints - 1] > 5.0f ? false : true;
+                }
+
+                if (!pointSelectedSurf_[static_cast<size_t>(i)]) {
+                    continue;
+                }
+
+                Eigen::Matrix<float, 4, 1> plane;
+                pointSelectedSurf_[static_cast<size_t>(i)] = false;
+                if (estiPlane<float>(plane, pointsNear, 0.1f)) {
+                    const float pd2 = plane(0) * pointWorld.x
+                        + plane(1) * pointWorld.y
+                        + plane(2) * pointWorld.z
+                        + plane(3);
+                    const float score = 1.0f - 0.9f * std::fabs(pd2) / std::sqrt(pBody.norm());
+                    if (score > 0.9f) {
+                        pointSelectedSurf_[static_cast<size_t>(i)] = true;
+                        LioPoint& normal = normvec_->points[static_cast<size_t>(i)];
+                        normal.x = plane(0);
+                        normal.y = plane(1);
+                        normal.z = plane(2);
+                        normal.intensity = pd2;
+                        resLast_[static_cast<size_t>(i)] = std::fabs(pd2);
+                    }
                 }
             }
         }
@@ -346,7 +351,7 @@ private:
     LioCloud::Ptr corrNormvec_{std::make_shared<LioCloud>()};
 
     std::vector<LioPointVector> nearestPoints_;
-    std::vector<bool> pointSelectedSurf_;
+    std::vector<uint8_t> pointSelectedSurf_;
     std::vector<float> resLast_;
 
     int featsDownSize_{0};

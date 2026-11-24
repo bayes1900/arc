@@ -772,13 +772,13 @@ void KdTree<PointType>::nearestSearch(PointType point, int kNearest, PointVector
         searchMutexCounter_ -= 1;
         pthread_mutex_unlock(&searchFlagMutex_);
     }
-    int k_found = std::min(kNearest, static_cast<int>(q.size()));
-    PointVector().swap(nearestPoints);
-    std::vector<float>().swap(pointDistance);
-    for (int i = 0; i < k_found; i++)
+    const int kFound = std::min(kNearest, static_cast<int>(q.size()));
+    nearestPoints.resize(static_cast<size_t>(kFound));
+    pointDistance.resize(static_cast<size_t>(kFound));
+    for (int i = kFound - 1; i >= 0; -- i)
     {
-        nearestPoints.insert(nearestPoints.begin(), q.top().point);
-        pointDistance.insert(pointDistance.begin(), q.top().dist);
+        nearestPoints[static_cast<size_t>(i)] = q.top().point;
+        pointDistance[static_cast<size_t>(i)] = q.top().dist;
         q.pop();
     }
     return;
