@@ -21,6 +21,7 @@ public:
         int dimension;
         int dof;
     };
+
     struct MatrixState {
         int index;
         int dimension;

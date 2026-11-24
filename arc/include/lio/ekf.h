@@ -13,6 +13,7 @@ public:
     static constexpr int STATE_DOF = LioState::DOF;
     static constexpr int STATE_DIM = LioState::DIM;
     static constexpr int PROCESS_NOISE_DOF = 12;
+
     using Scalar = double;
     using StateVector = Eigen::Matrix<Scalar, STATE_DOF, 1>;
     using Covariance = Eigen::Matrix<Scalar, STATE_DOF, STATE_DOF>;
@@ -36,20 +37,17 @@ public:
         state_.buildStateIndex();
         limits_.fill(Scalar(0.001));
     }
-
     void initProcessModel(ProcessModel model, ProcessMatrix1 matrix1, ProcessMatrix2 matrix2) {
         processModel_ = std::move(model);
         processMatrix1_ = std::move(matrix1);
         processMatrix2_ = std::move(matrix2);
     }
-
     void initMeasurementModel(MeasurementModel model, int maxIterations, Scalar limit = Scalar(0.001)) {
         measurementModel_ = std::move(model);
         maxIterations_ = maxIterations;
         limits_.fill(limit);
         state_.buildStateIndex();
     }
-
     void predict(Scalar dt, const ProcessNoiseCovariance& processNoise, const LioInput& input) {
         const Eigen::Matrix<Scalar, STATE_DIM, 1> f = processModel_(state_, input);
         const Eigen::Matrix<Scalar, STATE_DIM, STATE_DOF> fX = processMatrix1_(state_, input);
@@ -57,19 +55,14 @@ public:
 
         LioState stateBefore = state_;
         state_.oPlus(f, dt);
-
         Covariance fX1 = Covariance::Identity();
         Covariance fXFinal = Covariance::Zero();
-        Eigen::Matrix<Scalar, STATE_DOF, PROCESS_NOISE_DOF> fWFinal =
-            Eigen::Matrix<Scalar, STATE_DOF, PROCESS_NOISE_DOF>::Zero();
+        Eigen::Matrix<Scalar, STATE_DOF, PROCESS_NOISE_DOF> fWFinal = Eigen::Matrix<Scalar, STATE_DOF, PROCESS_NOISE_DOF>::Zero();
 
         for (const auto& entry : state_.vectorState()) {
-            fXFinal.block(entry.index, 0, entry.dof, STATE_DOF) =
-                fX.block(entry.dimension, 0, entry.dof, STATE_DOF);
-            fWFinal.block(entry.index, 0, entry.dof, PROCESS_NOISE_DOF) =
-                fW.block(entry.dimension, 0, entry.dof, PROCESS_NOISE_DOF);
+            fXFinal.block(entry.index, 0, entry.dof, STATE_DOF) = fX.block(entry.dimension, 0, entry.dof, STATE_DOF);
+            fWFinal.block(entry.index, 0, entry.dof, PROCESS_NOISE_DOF) = fW.block(entry.dimension, 0, entry.dof, PROCESS_NOISE_DOF);
         }
-
         for (const auto& entry : state_.so3State()) {
             Eigen::Matrix<Scalar, 3, 1> segment;
             for (int i = 0; i < 3; ++ i) {
@@ -145,8 +138,7 @@ public:
                 for (int i = 0; i < 3; ++ i) {
                     segment(i) = dx(entry.index + i);
                 }
-                const Eigen::Matrix<Scalar, 3, 3> reparameterization =
-                    manifold::aMatrix(segment).transpose();
+                const Eigen::Matrix<Scalar, 3, 3> reparameterization = manifold::aMatrix(segment).transpose();
                 dxNew.block<3, 1>(entry.index, 0) = reparameterization * dxNew.block<3, 1>(entry.index, 0);
                 for (int i = 0; i < STATE_DOF; ++ i) {
                     covariance_.block<3, 1>(entry.index, i) = reparameterization * covariance_.block<3, 1>(entry.index, i);
@@ -192,7 +184,6 @@ public:
                 kX.setZero();
                 kX.block<STATE_DOF, PROCESS_NOISE_DOF>(0, 0) = pInv.block<STATE_DOF, PROCESS_NOISE_DOF>(0, 0) * hth;
             }
-
             const StateVector dxCorrection = kH + (kX - Covariance::Identity()) * dxNew;
             state_.boxPlus(dxCorrection);
             measurement.converge = true;
