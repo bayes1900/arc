@@ -54,7 +54,6 @@ private:
     std::vector<double> initialPose_;
     bool publishTf_{true};
     bool publishCloud_{true};
-    double imageSyncTolerance_{0.005};
     double lidarScanPeriod_{0.1};
 
     rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr lidarSub_;

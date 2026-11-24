@@ -35,7 +35,6 @@ public:
         state_ = kf_.state();
     }
     bool process(const MeasurementGroup& meas) {
-        lidarEndTime_ = meas.lidarEndTime;
         if (flgFirstScan_) {
             firstLidarTime_ = meas.lidarBeginTime;
             flgFirstScan_ = false;
@@ -78,8 +77,7 @@ public:
         pointSelectedSurf_.resize(static_cast<size_t>(featsDownSize_), 0);
         resLast_.resize(static_cast<size_t>(featsDownSize_), 0.0f);
 
-        double solveTime = 0.0;
-        kf_.update(LASER_POINT_COV, solveTime);
+        kf_.update(LASER_POINT_COV);
         state_ = kf_.state();
         posLid_ = state_.pos + state_.rot * state_.offsetTLI;
 
@@ -101,23 +99,11 @@ public:
     Vec3d velocity() const {
         return state_.vel;
     }
-    double lidarEndTime() const {
-        return lidarEndTime_;
-    }
     LioCloud::Ptr registeredCloud() const {
         auto cloud = std::make_shared<LioCloud>();
         cloud->resize(featsUndistort_->size());
         for (size_t i = 0; i < featsUndistort_->size(); ++ i) {
             cloud->points[i] = bodyToWorld_(featsUndistort_->points[i]);
-        }
-        return cloud;
-    }
-
-    LioCloud::Ptr bodyCloud() const {
-        auto cloud = std::make_shared<LioCloud>();
-        cloud->resize(featsUndistort_->size());
-        for (size_t i = 0; i < featsUndistort_->size(); ++ i) {
-            cloud->points[i] = bodyToImu_(featsUndistort_->points[i]);
         }
         return cloud;
     }
@@ -133,10 +119,8 @@ private:
     }
 
     void measurementModel_(LioState& state, LioEkf::MeasurementData& ekfomData) {
-        const double matchStart = omp_get_wtime();
         laserCloudOri_->clear();
         corrNormvec_->clear();
-        totalResidual_ = 0.0;
 
 #ifdef _OPENMP
 #pragma omp parallel
@@ -203,7 +187,6 @@ private:
                 featsDownBody_->points[static_cast<size_t>(i)];
             corrNormvec_->points[static_cast<size_t>(effctFeatNum_)] =
                 normvec_->points[static_cast<size_t>(i)];
-            totalResidual_ += resLast_[static_cast<size_t>(i)];
             ++ effctFeatNum_;
         }
 
@@ -212,9 +195,6 @@ private:
             std::cerr << "[lio] No effective points" << std::endl;
             return;
         }
-
-        resMeanLast_ = totalResidual_ / effctFeatNum_;
-        (void)matchStart;
 
         ekfomData.hX = Eigen::MatrixXd::Zero(effctFeatNum_, 12);
         ekfomData.h.resize(effctFeatNum_);
@@ -310,17 +290,6 @@ private:
         return output;
     }
 
-    LioPoint bodyToImu_(const LioPoint& point) const {
-        const Vec3d body(point.x, point.y, point.z);
-        const Vec3d imu = state_.offsetRLI * body + state_.offsetTLI;
-        LioPoint output;
-        output.x = static_cast<float>(imu.x());
-        output.y = static_cast<float>(imu.y());
-        output.z = static_cast<float>(imu.z());
-        output.intensity = point.intensity;
-        return output;
-    }
-
 private:
     static constexpr double INIT_TIME = 0.1;
     static constexpr double LASER_POINT_COV = 0.001;
@@ -345,10 +314,7 @@ private:
 
     int featsDownSize_{0};
     int effctFeatNum_{0};
-    double totalResidual_{0.0};
-    double resMeanLast_{0.05};
     double firstLidarTime_{0.0};
-    double lidarEndTime_{0.0};
     Vec3d posLid_{Vec3d::Zero()};
     bool flgFirstScan_{true};
     bool flgEKFInited_{false};

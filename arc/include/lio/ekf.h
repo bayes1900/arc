@@ -4,7 +4,6 @@
 #include <base/manifold/math.h>
 #include <base/manifold/so3.h>
 #include <lio/state.h>
-#include <omp.h>
 
 namespace arc {
 
@@ -107,7 +106,7 @@ public:
         fX1 += fXFinal * dt;
         covariance_ = fX1 * covariance_ * fX1.transpose() + (dt * fWFinal) * processNoise * (dt * fWFinal).transpose();
     }
-    void update(Scalar measurementVariance, Scalar& solveTime) {
+    void update(Scalar measurementVariance) {
         MeasurementData measurement;
         LioState statePropagated = state_;
         Covariance covariancePropagated = covariance_;
@@ -125,7 +124,6 @@ public:
                 continue;
             }
             const Eigen::Matrix<Scalar, Eigen::Dynamic, PROCESS_NOISE_DOF> hX = measurement.hX;
-            const double solveStart = omp_get_wtime();
             dofMeasurement = static_cast<int>(hX.rows());
 
             StateVector dx;
@@ -241,10 +239,8 @@ public:
                     }
                 }
                 covariance_ = l - kX.block<STATE_DOF, PROCESS_NOISE_DOF>(0, 0) * covariance_.block<PROCESS_NOISE_DOF, STATE_DOF>(0, 0);
-                solveTime += omp_get_wtime() - solveStart;
                 return;
             }
-            solveTime += omp_get_wtime() - solveStart;
         }
     }
     const LioState& state() const {

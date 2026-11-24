@@ -13,8 +13,7 @@ namespace arc {
 class LioPipeline {
 public:
     explicit LioPipeline(const LioConfig& config)
-        : config_(config)
-        , estimator_(config)
+        : estimator_(config)
         , preprocessor_(config)
     {}
     ~LioPipeline() {
@@ -150,7 +149,6 @@ private:
     static constexpr size_t MAX_LIDAR_BUFFER = 20;
     static constexpr size_t MAX_IMU_BUFFER = 5000;
 
-    LioConfig config_;
     LioEstimator estimator_;
     PointPreprocessor preprocessor_;
 

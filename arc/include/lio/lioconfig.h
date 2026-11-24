@@ -20,7 +20,6 @@ struct LioConfig {
     double filterSizeMap{0.5};
     double cubeSideLength{200.0};
     double detRange{300.0};
-    double fovDegree{180.0};
 
     double accCov{0.1};
     double gyrCov{0.1};
@@ -30,14 +29,7 @@ struct LioConfig {
     Vec3d extrinsicT{Vec3d::Zero()};
     Mat3d extrinsicR{Mat3d::Identity()};
 
-    bool timeSyncEnable{false};
     double timeOffsetLidarToImu{0.0};
-
-    bool publishPath{false};
-    bool publishScan{true};
-    bool publishDense{true};
-    bool publishScanBody{false};
-    int publishFramePeriod{20};
 
     static LioConfig loadConfig(const std::string& path) {
         return configFromYaml_(YAML::LoadFile(path));
@@ -150,7 +142,6 @@ private:
         config.filterSizeMap = yamlOrAny_(node, "filterSizeMap", config.filterSizeMap);
         config.cubeSideLength = yamlOrAny_(node, "cubeSideLength", config.cubeSideLength);
         config.detRange = yamlOrAny_(mapping, "detRange", config.detRange);
-        config.fovDegree = yamlOrAny_(mapping, "fovDegree", config.fovDegree);
 
         config.accCov = yamlOrAny_(mapping, "accCov", config.accCov);
         config.gyrCov = yamlOrAny_(mapping, "gyrCov", config.gyrCov);
@@ -160,14 +151,7 @@ private:
         config.extrinsicT = vec3From_(mapping["extrinsicT"], config.extrinsicT);
         config.extrinsicR = mat3From_(mapping["extrinsicR"], config.extrinsicR);
 
-        config.timeSyncEnable = yamlOrAny_(node, "timeSyncEnable", config.timeSyncEnable);
         config.timeOffsetLidarToImu = yamlOrAny_(node, "timeOffsetLidarToImu", config.timeOffsetLidarToImu);
-
-        config.publishPath = yamlOrAny_(node, "publishPath", config.publishPath);
-        config.publishScan = yamlOrAny_(node, "publishScan", config.publishScan);
-        config.publishDense = yamlOrAny_(node, "publishDense", config.publishDense);
-        config.publishScanBody = yamlOrAny_(node, "publishScanBody", config.publishScanBody);
-        config.publishFramePeriod = yamlOrAny_(node, "publishFramePeriod", config.publishFramePeriod);
 
         return config;
     }

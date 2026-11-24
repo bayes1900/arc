@@ -90,20 +90,8 @@ public:
     int addPoints(LioPointVector& points, bool downsampleOn) {
         return tree_->addPoints(points, downsampleOn);
     }
-    int deletePointBoxes(std::vector<BoxPointType>& boxes) {
-        return tree_->deletePointBoxes(boxes);
-    }
     int size() {
         return tree_->size();
-    }
-    int validNum() {
-        return tree_->validNum();
-    }
-    void flatten(LioPointVector& storage) {
-        tree_->flatten(tree_->root_, storage, DeleteStorage::NOT_RECORD);
-    }
-    void acquireRemovedPoints(LioPointVector& points) {
-        tree_->acquireRemovedPoints(points);
     }
 
 private:
