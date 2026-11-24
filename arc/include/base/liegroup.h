@@ -1,8 +1,5 @@
 #pragma once
 
-// SO(3) Jacobians used by VIO IMU preintegration.
-// LIO IKFoM-style manifold adapters live in base/manifold.
-
 #include <sophus/se3.hpp>
 #include <base/base.h>
 

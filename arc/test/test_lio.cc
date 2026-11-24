@@ -114,10 +114,18 @@ TEST(LioMath, So3ExpLogRoundTrip) {
     EXPECT_TRUE(recovered.isApprox(omega, 1e-9));
 }
 
-TEST(LioMath, So3LeftJacobianAlias) {
+TEST(LioMath, So3LeftJacobian) {
+    const Eigen::Vector3d zero = Eigen::Vector3d::Zero();
+    EXPECT_TRUE(arc::manifold::leftJacobianSO3(zero).isApprox(
+        Eigen::Matrix3d::Identity(), 1e-15));
+
     const Eigen::Vector3d phi(0.1, -0.2, 0.3);
-    EXPECT_TRUE(arc::manifold::leftJacobianSO3(phi).isApprox(
-        arc::manifold::aMatrix(phi), 1e-12));
+    const Eigen::Vector3d delta(1e-7, -2e-7, 3e-7);
+    const Eigen::Matrix3d lhs = Sophus::SO3d::exp(phi + delta).matrix();
+    const Eigen::Matrix3d rhs = (
+        Sophus::SO3d::exp(arc::manifold::leftJacobianSO3(phi) * delta)
+        * Sophus::SO3d::exp(phi)).matrix();
+    EXPECT_TRUE(lhs.isApprox(rhs, 1e-9));
 }
 
 TEST(LioManifold, So3BoxPlusMinus) {

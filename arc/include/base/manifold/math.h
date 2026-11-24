@@ -46,9 +46,9 @@ inline std::pair<T, T> cosSincSqrt(const T& squaredAngle) {
     return {cosine, sinc};
 }
 
-// Left Jacobian of SO(3); IKFoM calls this A_matrix.
+// Left Jacobian of SO(3).
 template <typename T>
-inline Eigen::Matrix<T, 3, 3> aMatrix(const Eigen::Matrix<T, 3, 1>& vector) {
+inline Eigen::Matrix<T, 3, 3> leftJacobianSO3(const Eigen::Matrix<T, 3, 1>& vector) {
     const T squaredNorm = vector.squaredNorm();
     const T norm = std::sqrt(squaredNorm);
     if (norm < tolerance<T>()) {
@@ -58,11 +58,6 @@ inline Eigen::Matrix<T, 3, 3> aMatrix(const Eigen::Matrix<T, 3, 1>& vector) {
     return Eigen::Matrix<T, 3, 3>::Identity()
         + (T(1) - std::cos(norm)) / squaredNorm * skew
         + (T(1) - std::sin(norm) / norm) / squaredNorm * skew * skew;
-}
-
-template <typename T>
-inline Eigen::Matrix<T, 3, 3> leftJacobianSO3(const Eigen::Matrix<T, 3, 1>& vector) {
-    return aMatrix(vector);
 }
 
 // Rodrigues matrix convenience; expSO3 in so3.h keeps the filter-critical
