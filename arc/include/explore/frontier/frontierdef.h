@@ -112,7 +112,6 @@ private:
 struct FrontierParams {
     int clusterMin{100};
     double clusterSizeXY{2.0};
-    double clusterSizeZ{10.0};
 
     double minCandidateDist{0.5};
     double minCandidateClearance{0.21};

@@ -49,13 +49,6 @@ public:
         cost_.refresh(activeFrontiers_, removedFrontierIndices_);
         removedFrontierIndices_.clear();
     }
-    void getFrontiers(std::vector<std::vector<Eigen::Vector3d>>& clusters) const {
-        clusters.clear();
-        clusters.reserve(activeFrontiers_.size());
-        for (const auto& frontier : activeFrontiers_) {
-            clusters.push_back(frontier.cells);
-        }
-    }
     size_t activeFrontierCount() const {
         return activeFrontiers_.size();
     }
@@ -64,20 +57,6 @@ public:
     }
     const std::vector<Frontier>& frontiers() const {
         return activeFrontiers_;
-    }
-    void getDormantFrontiers(std::vector<std::vector<Eigen::Vector3d>>& clusters) const {
-        clusters.clear();
-        clusters.reserve(dormantFrontiers_.size());
-        for (const auto& frontier : dormantFrontiers_) {
-            clusters.push_back(frontier.cells);
-        }
-    }
-    void getFrontierBoxes(std::vector<std::pair<Eigen::Vector3d, Eigen::Vector3d>>& boxes) const {
-        boxes.clear();
-        boxes.reserve(activeFrontiers_.size());
-        for (const auto& frontier : activeFrontiers_) {
-            boxes.emplace_back((frontier.boxMin + frontier.boxMax) * 0.5, frontier.boxMax - frontier.boxMin);
-        }
     }
     void selectTopViewpoints(
         const Eigen::Vector3d& curPos,

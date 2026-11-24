@@ -32,9 +32,6 @@ public:
     }
 
 public:
-    bool needsESDFUpdate() const {
-        return esdfNeedUpdate_;
-    }
     void updateESDF() {
         if (!esdfNeedUpdate_) {
             return;
@@ -134,6 +131,7 @@ public:
             raycastIndex_ = 1;
         }
         Eigen::Vector3i idx;
+        const double maxRayLengthSquared = mp_.maxRayLength * mp_.maxRayLength;
         if (md_.resetUpdatedBox) {
             md_.updateMin = cameraPos;
             md_.updateMax = cameraPos;
@@ -147,9 +145,9 @@ public:
                 pos = findClosestPoint(pos, cameraPos);
                 occ = VoxelOccupancyCode::FREE;
             }
-            double length = (pos - cameraPos).norm();
-            if (length > mp_.maxRayLength) {
-                pos = (pos - cameraPos) / length * mp_.maxRayLength + cameraPos;
+            const Eigen::Vector3d delta = pos - cameraPos;
+            if (delta.squaredNorm() > maxRayLengthSquared) {
+                pos = cameraPos + delta * (mp_.maxRayLength / delta.norm());
                 occ = VoxelOccupancyCode::FREE;
             }
             Eigen::Vector3i posIdx = mp_.p2i(pos);
@@ -229,12 +227,6 @@ public:
         md_.localBoundMax = localMax;
         md_.updateInflateOccupancy();
         ++ md_.updateRevision;
-    }
-    void resetBuffer() {
-        md_.reset();
-        raycastIndex_ = 0;
-        initialized_ = false;
-        esdfNeedUpdate_ = false;
     }
 
 private:

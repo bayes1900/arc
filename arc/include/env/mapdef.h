@@ -98,14 +98,6 @@ struct MapParams {
     void boundIndex(Eigen::Vector3i& idx) const {
         idx = idx.cwiseMax(0).cwiseMin(voxelShape - Eigen::Vector3i::Ones());
     }
-    void clampPoints(Eigen::MatrixXd& points) const {
-        const Eigen::Array3d lower = origin.array() + 1e-3;
-        const Eigen::Array3d upper = endpoint.array() - 1e-3;
-        const Eigen::Index cols = std::min<Eigen::Index>(points.cols(), 3);
-        for (Eigen::Index j = 0; j < cols; ++ j) {
-            points.col(j).array() = points.col(j).array().max(lower(j)).min(upper(j));
-        }
-    }
     int inflateStep() const {
         return std::max(0, static_cast<int>(std::ceil(inflation / resolution)));
     }

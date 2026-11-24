@@ -78,9 +78,31 @@ public:
         while (k < kMax && u_(k + 1) <= u) {
             k += 1;
         };
-        std::vector<Eigen::VectorXd> d(order_ + 1);
+        const Eigen::Index dims = points_.cols();
+        Eigen::VectorXd result(dims);
+        if (order_ <= 3 && dims <= 3) {
+            Eigen::Matrix<double, 4, 3> d;
+            for (int i = 0; i <= order_; ++ i) {
+                d.row(i).head(dims) = points_.row(k - order_ + i);
+            }
+            for (int r = 1; r <= order_; ++ r) {
+                for (int i = order_; i >= r; -- i) {
+                    const int knotIndex = i + k - order_;
+                    const double denominator = u_(i + 1 + k - r) - u_(knotIndex);
+                    double alpha = 0.0;
+                    if (std::abs(denominator) > 1e-12) {
+                        alpha = (u - u_(knotIndex)) / denominator;
+                    }
+                    d.row(i).head(dims) =
+                        (1.0 - alpha) * d.row(i - 1).head(dims) + alpha * d.row(i).head(dims);
+                }
+            }
+            result = d.row(order_).head(dims).transpose();
+            return result;
+        }
+        Eigen::MatrixXd d(order_ + 1, dims);
         for (int i = 0; i <= order_; ++ i) {
-            d[i] = points_.row(k - order_ + i).transpose();
+            d.row(i) = points_.row(k - order_ + i);
         }
         for (int r = 1; r <= order_; ++ r) {
             for (int i = order_; i >= r; -- i) {
@@ -90,10 +112,10 @@ public:
                 if (std::abs(denominator) > 1e-12) {
                     alpha = (u - u_(knotIndex)) / denominator;
                 }
-                d[i] = (1.0 - alpha) * d[i - 1] + alpha * d[i];
+                d.row(i) = (1.0 - alpha) * d.row(i - 1) + alpha * d.row(i);
             }
         }
-        return d[order_];
+        return d.row(order_).transpose();
     }
     Eigen::VectorXd evalt(double t) const {
         double u = std::min<double>(std::max<double>(t, 0.0), duration_) + ustart_;
@@ -137,102 +159,6 @@ public:
         for (int i = 0; i < static_cast<int>(derivatives.size()); ++ i) {
             end.push_back(Eigen::Vector3d(derivatives[i].evalt(derivatives[i].duration_).head<3>()));
         }
-    }
-    double getMaxVel() const {
-        double maxVel = 0.0;
-        for (int i = 0; i < points_.rows() - 1; ++ i) {
-            const double denominator = u_(i + order_ + 1) - u_(i + 1);
-            if (std::abs(denominator) < 1e-12) {
-                continue;
-            }
-            const Eigen::VectorXd vel = order_ * (points_.row(i + 1) - points_.row(i)) / denominator;
-            maxVel = std::max(maxVel, vel.cwiseAbs().maxCoeff());
-        }
-        return maxVel;
-    }
-    double getMaxAcc() const {
-        double maxAcc = 0.0;
-        for (int i = 0; i < points_.rows() - 2; ++ i) {
-            const double denominator = u_(i + order_ + 1) - u_(i + 2);
-            if (std::abs(denominator) < 1e-12) {
-                continue;
-            }
-            const double nextSpan = u_(i + order_ + 2) - u_(i + 2);
-            const double prevSpan = u_(i + order_ + 1) - u_(i + 1);
-            const Eigen::VectorXd nextDiff = (points_.row(i + 2) - points_.row(i + 1)).transpose();
-            const Eigen::VectorXd prevDiff = (points_.row(i + 1) - points_.row(i)).transpose();
-            const Eigen::VectorXd acc = order_ * (order_ - 1) * (nextDiff / nextSpan - prevDiff / prevSpan) / denominator;
-            maxAcc = std::max(maxAcc, acc.cwiseAbs().maxCoeff());
-        }
-        return maxAcc;
-    }
-    bool reallocateTime() {
-        bool feasible = true;
-
-        for (int i = 0; i < points_.rows() - 1; ++ i) {
-            const double timeOri = u_(i + order_ + 1) - u_(i + 1);
-            if (std::abs(timeOri) < 1e-12) {
-                continue;
-            }
-            const Eigen::VectorXd vel = order_ * (points_.row(i + 1) - points_.row(i)) / timeOri;
-            const double maxVel = vel.cwiseAbs().maxCoeff();
-            if (maxVel <= options_.maxVel + 1e-4) {
-                continue;
-            }
-            feasible = false;
-            double ratio = maxVel / options_.maxVel + 1e-4;
-            ratio = std::min(ratio, options_.maxExpandRatio);
-            const double deltaT = (ratio - 1.0) * timeOri;
-            const double tInc = deltaT / static_cast<double>(order_);
-
-            for (int j = i + 2; j <= i + order_ + 1; ++ j) {
-                u_(j) += static_cast<double>(j - i - 1) * tInc;
-            }
-            for (int j = i + order_ + 2; j < u_.size(); ++ j) {
-                u_(j) += deltaT;
-            }
-        }
-        for (int i = 0; i < points_.rows() - 2; ++ i) {
-            const double timeOri = u_(i + order_ + 1) - u_(i + 2);
-            if (std::abs(timeOri) < 1e-12) {
-                continue;
-            }
-            const double nextSpan = u_(i + order_ + 2) - u_(i + 2);
-            const double prevSpan = u_(i + order_ + 1) - u_(i + 1);
-            const Eigen::VectorXd nextDiff = (points_.row(i + 2) - points_.row(i + 1)).transpose();
-            const Eigen::VectorXd prevDiff = (points_.row(i + 1) - points_.row(i)).transpose();
-            const Eigen::VectorXd acc = order_ * (order_ - 1) * (nextDiff / nextSpan - prevDiff / prevSpan) / timeOri;
-            const double maxAcc = acc.cwiseAbs().maxCoeff();
-            if (maxAcc <= options_.maxAcc + 1e-4) {
-                continue;
-            }
-            feasible = false;
-            double ratio = std::sqrt(maxAcc / options_.maxAcc) + 1e-4;
-            ratio = std::min(ratio, options_.maxExpandRatio);
-            const double deltaT = (ratio - 1.0) * timeOri;
-
-            if (i == 1 || i == 2) {
-                const double tInc = deltaT / static_cast<double>(order_ - 1);
-                for (int j = 2; j <= 5; ++ j) {
-                    u_(j) += static_cast<double>(j - 1) * tInc;
-                }
-                for (int j = 6; j < u_.size(); ++j) {
-                    u_(j) += 4.0 * tInc;
-                }
-            } else {
-                const double tInc = deltaT / static_cast<double>(order_ - 1);
-                for (int j = i + 3; j <= i + order_ + 1; ++ j) {
-                    u_(j) += static_cast<double>(j - i - 2) * tInc;
-                }
-                for (int j = i + order_ + 2; j < u_.size(); ++ j) {
-                    u_(j) += deltaT;
-                }
-            }
-        }
-        ustart_ = u_(order_);
-        uend_ = u_(numPoints_);
-        duration_ = uend_ - ustart_;
-        return feasible;
     }
 
 private:

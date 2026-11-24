@@ -125,26 +125,30 @@ private:
         if (time <= history_.front().first) {
             return history_.front().second;
         }
-        if (time >= history_.back().first) {
+        const auto iter = std::lower_bound(
+            history_.begin(), history_.end(), time,
+            [](const std::pair<double, Mat4d>& entry, double value) {
+                return entry.first < value;
+            });
+        if (iter == history_.end()) {
             return history_.back().second;
         }
-        for (size_t i = 1; i < history_.size(); ++ i) {
-            if (history_[i].first >= time) {
-                const double t0 = history_[i - 1].first;
-                const double t1 = history_[i].first;
-                const double ratio = t1 > t0 ? (time - t0) / (t1 - t0) : 0.0;
-                const Mat4d& p0 = history_[i - 1].second;
-                const Mat4d& p1 = history_[i].second;
-                Mat4d pose = Mat4d::Identity();
-                pose.block<3, 1>(0, 3) = p0.block<3, 1>(0, 3)
-                    + ratio * (p1.block<3, 1>(0, 3) - p0.block<3, 1>(0, 3));
-                const Eigen::Quaterniond q0(p0.block<3, 3>(0, 0));
-                const Eigen::Quaterniond q1(p1.block<3, 3>(0, 0));
-                pose.block<3, 3>(0, 0) = q0.slerp(ratio, q1).toRotationMatrix();
-                return pose;
-            }
+        if (iter == history_.begin()) {
+            return history_.front().second;
         }
-        return history_.back().second;
+        const auto& previous = *(iter - 1);
+        const double t0 = previous.first;
+        const double t1 = iter->first;
+        const double ratio = t1 > t0 ? (time - t0) / (t1 - t0) : 0.0;
+        const Mat4d& p0 = previous.second;
+        const Mat4d& p1 = iter->second;
+        Mat4d pose = Mat4d::Identity();
+        pose.block<3, 1>(0, 3) = p0.block<3, 1>(0, 3)
+            + ratio * (p1.block<3, 1>(0, 3) - p0.block<3, 1>(0, 3));
+        const Eigen::Quaterniond q0(p0.block<3, 3>(0, 0));
+        const Eigen::Quaterniond q1(p1.block<3, 3>(0, 0));
+        pose.block<3, 3>(0, 0) = q0.slerp(ratio, q1).toRotationMatrix();
+        return pose;
     }
 
     void render_() {
@@ -168,15 +172,20 @@ private:
         const double verticalSpan = std::max(verticalMax - verticalMin, 1e-6);
         const size_t pixelCount = static_cast<size_t>(ringCount) * azimuthCount;
 
-        std::vector<float> rangeImage(pixelCount, static_cast<float>(maxRange_ + 1.0));
-        std::vector<int> pointImage(pixelCount, -1);
+        std::vector<float>& rangeImage = rangeImage_;
+        std::vector<int>& pointImage = pointImage_;
+        rangeImage.assign(pixelCount, static_cast<float>(maxRange_ + 1.0));
+        pointImage.assign(pixelCount, -1);
+        const double minRangeSquared = minRange_ * minRange_;
+        const double maxRangeSquared = maxRange_ * maxRange_;
 
         for (size_t i = 0; i < mapPoints_.size(); ++ i) {
             const Eigen::Vector3d local = startRotation * (mapPoints_[i] - sensorPosition);
-            const double range = local.norm();
-            if (range < minRange_ || range > maxRange_) {
+            const double rangeSquared = local.squaredNorm();
+            if (rangeSquared < minRangeSquared || rangeSquared > maxRangeSquared) {
                 continue;
             }
+            const double range = std::sqrt(rangeSquared);
             const double azimuth = std::atan2(local.y(), local.x());
             const double normalizedAzimuth = azimuth < 0.0
                 ? (azimuth + 2.0 * __pi__) / (2.0 * __pi__)
@@ -198,7 +207,16 @@ private:
             }
         }
 
-        pcl::PointCloud<LidarRenderPoint> cloud;
+        if (motionDistortion_) {
+            distortionPoses_.resize(azimuthCount);
+            for (int azimuthIndex = 0; azimuthIndex < azimuthCount; ++ azimuthIndex) {
+                const double pointTime = static_cast<double>(azimuthIndex) / azimuthCount * scanPeriod;
+                distortionPoses_[azimuthIndex] = poseAt_(scanStart + pointTime);
+            }
+        }
+
+        pcl::PointCloud<LidarRenderPoint>& cloud = scanCloud_;
+        cloud.clear();
         cloud.reserve(pixelCount);
         for (int ring = 0; ring < ringCount; ++ ring) {
             for (int azimuthIndex = 0; azimuthIndex < azimuthCount; ++ azimuthIndex) {
@@ -212,7 +230,7 @@ private:
 
                 Eigen::Vector3d local;
                 if (motionDistortion_) {
-                    const Mat4d pointPose = poseAt_(scanStart + pointTime);
+                    const Mat4d& pointPose = distortionPoses_[azimuthIndex];
                     local = pointPose.block<3, 3>(0, 0).transpose()
                         * (worldPoint - pointPose.block<3, 1>(0, 3));
                 } else {
@@ -265,6 +283,10 @@ private:
 
     std::vector<Eigen::Vector3d> mapPoints_;
     std::deque<std::pair<double, Mat4d>> history_;
+    std::vector<float> rangeImage_;
+    std::vector<int> pointImage_;
+    std::vector<Mat4d> distortionPoses_;
+    pcl::PointCloud<LidarRenderPoint> scanCloud_;
     Mat4d lastOdomPose_{Mat4d::Identity()};
     double lastOdomTime_{-1.0};
     bool hasMap_{false};

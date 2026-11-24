@@ -109,7 +109,6 @@ public:
     }
 
 protected:
-    std::array<int64_t, 2> frameIds_;
     MatXd jp_;
     VecXd r_;
     const IntegratedImuMeasurement* imuMeas_;

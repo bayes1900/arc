@@ -13,15 +13,9 @@ public:
     enum PublisherId {
         TRAJECTORY = 0,
         TOPO_PATH = 1,
-        PREDICTION = 2,
-        VISIBILITY = 3,
-        FRONTIER = 4,
-        YAW = 5,
-        VIEWPOINT = 6
-    };
-    enum TrajectoryId {
-        GOAL = 1,
-        PATH = 200
+        FRONTIER = 2,
+        YAW = 3,
+        VIEWPOINT = 4
     };
     explicit PlanningVisualization(rclcpp::Node::SharedPtr node)
         : node_(std::move(node))
@@ -31,12 +25,6 @@ public:
         ));
         pubs_.push_back(node_->create_publisher<visualization_msgs::msg::Marker>(
             "/planning_vis/topo_path", rclcpp::QoS(100)
-        ));
-        pubs_.push_back(node_->create_publisher<visualization_msgs::msg::Marker>(
-            "/planning_vis/prediction", rclcpp::QoS(100)
-        ));
-        pubs_.push_back(node_->create_publisher<visualization_msgs::msg::Marker>(
-            "/planning_vis/visib_constraint", rclcpp::QoS(100)
         ));
         pubs_.push_back(node_->create_publisher<visualization_msgs::msg::Marker>(
             "/planning_vis/frontier", rclcpp::QoS(10000)

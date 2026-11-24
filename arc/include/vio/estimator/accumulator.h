@@ -3,7 +3,6 @@
 #include <Eigen/Dense>
 
 #include <base/base.h>
-#include <base/base.h>
 
 namespace arc {
 

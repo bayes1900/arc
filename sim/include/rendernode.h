@@ -70,15 +70,10 @@ public:
         sensorPosePub_ = node_->create_publisher<geometry_msgs::msg::PoseStamped>("sensor_pose", 1000);
 
         sensingTimer_ = node_->create_wall_timer(
-            std::chrono::duration<double>(1.0 / std::max(sensingRate_, 1e-3)),
-            [this]() { renderFrame_(true, false); }
+            std::chrono::duration<double>(
+                1.0 / std::max(std::max(sensingRate_, imageRate_), 1e-3)),
+            [this]() { renderFrame_(); }
         );
-        if (imageRate_ > 0.0) {
-            imageTimer_ = node_->create_wall_timer(
-                std::chrono::duration<double>(1.0 / imageRate_),
-                [this]() { renderFrame_(false, true); }
-            );
-        }
         poseTimer_ = node_->create_wall_timer(
             std::chrono::duration<double>(1.0 / std::max(estimationRate_, 1e-3)),
             [this]() { publishSensorPose_(); }
@@ -95,6 +90,21 @@ private:
             return;
         }
         hasGlobalMap_ = true;
+        pointIntensity_.resize(cloudIn_.size());
+        for (size_t i = 0; i < cloudIn_.size(); ++ i) {
+            const auto& point = cloudIn_.points[i];
+            const double waveA = std::sin(
+                textureScale_ * (3.1 * point.x + 1.7 * point.y + 2.3 * point.z));
+            const double waveB = std::cos(
+                textureScale_ * (5.3 * point.x - 2.9 * point.y + 1.1 * point.z));
+            const uint32_t hash = static_cast<uint32_t>(
+                static_cast<int32_t>(point.x * 1000.0f) * 73856093u ^
+                static_cast<int32_t>(point.y * 1000.0f) * 19349663u ^
+                static_cast<int32_t>(point.z * 1000.0f) * 83492791u);
+            const double noise = static_cast<double>(hash & 0xffu) / 255.0 - 0.5;
+            pointIntensity_[i] = static_cast<uint8_t>(
+                std::clamp(128.0 + 70.0 * waveA * waveB + 110.0 * noise, 0.0, 255.0));
+        }
         RCLCPP_INFO(node_->get_logger(), "global map received: %zu points", cloudIn_.size());
     }
 
@@ -119,26 +129,38 @@ private:
 
         cam2world_ = pose * cam02body_;
         cam2worldQuat_ = Eigen::Quaterniond(cam2world_.block<3, 3>(0, 0));
+        const Eigen::Matrix4d Tcw = cam2world_.inverse();
+        Rcw_ = Tcw.block<3, 3>(0, 0);
+        tcw_ = Tcw.block<3, 1>(0, 3);
+        cameraPos_ = cam2world_.block<3, 1>(0, 3);
     }
 
-    void renderFrame_(bool publishDepth, bool publishImage) {
+    void renderFrame_() {
         if (!hasGlobalMap_ || !hasOdom_) {
             return;
         }
-        depthMat_ = cv::Mat::zeros(height_, width_, CV_32FC1);
-        intensityMat_ = cv::Mat::zeros(height_, width_, CV_8UC1);
+        const double now = node_->now().seconds();
+        const bool publishDepth = sensingRate_ <= 0.0 || lastDepthPublish_ < 0.0 ||
+            now - lastDepthPublish_ >= 1.0 / sensingRate_ - 1e-6;
+        const bool publishImage = imageRate_ > 0.0 && (lastImagePublish_ < 0.0 ||
+            now - lastImagePublish_ >= 1.0 / imageRate_ - 1e-6);
 
-        const Eigen::Matrix4d Tcw = cam2world_.inverse();
-        const Eigen::Matrix3d Rcw = Tcw.block<3, 3>(0, 0);
-        const Eigen::Vector3d tcw = Tcw.block<3, 1>(0, 3);
-        const Eigen::Vector3d cameraPos = cam2world_.block<3, 1>(0, 3);
+        if (depthMat_.rows != height_ || depthMat_.cols != width_) {
+            depthMat_ = cv::Mat::zeros(height_, width_, CV_32FC1);
+            intensityMat_ = cv::Mat::zeros(height_, width_, CV_8UC1);
+        } else {
+            depthMat_.setTo(0.0f);
+            intensityMat_.setTo(0);
+        }
 
-        for (const auto& point : cloudIn_.points) {
+        const double horizonSquared = sensingHorizon_ * sensingHorizon_;
+        for (size_t i = 0; i < cloudIn_.size(); ++ i) {
+            const auto& point = cloudIn_.points[i];
             const Eigen::Vector3d pw(point.x, point.y, point.z);
-            if ((cameraPos - pw).norm() > sensingHorizon_) {
+            if ((cameraPos_ - pw).squaredNorm() > horizonSquared) {
                 continue;
             }
-            const Eigen::Vector3d pc = Rcw * pw + tcw;
+            const Eigen::Vector3d pc = Rcw_ * pw + tcw_;
             if (pc(2) <= 0.0) {
                 continue;
             }
@@ -149,18 +171,7 @@ private:
             }
 
             const double depth = pc(2);
-            const double waveA = std::sin(
-                textureScale_ * (3.1 * point.x + 1.7 * point.y + 2.3 * point.z));
-            const double waveB = std::cos(
-                textureScale_ * (5.3 * point.x - 2.9 * point.y + 1.1 * point.z));
-            const uint32_t hash = static_cast<uint32_t>(
-                static_cast<int32_t>(point.x * 1000.0f) * 73856093u ^
-                static_cast<int32_t>(point.y * 1000.0f) * 19349663u ^
-                static_cast<int32_t>(point.z * 1000.0f) * 83492791u);
-            const double noise = static_cast<double>(hash & 0xffu) / 255.0 - 0.5;
-            const int intensity = static_cast<int>(
-                std::clamp(128.0 + 70.0 * waveA * waveB + 110.0 * noise, 0.0, 255.0));
-
+            const uint8_t intensity = pointIntensity_[i];
             const int radius = static_cast<int>(0.0573 * fx_ / depth + 0.5);
             const int minX = std::max(static_cast<int>(projectedX) - radius, 0);
             const int maxX = std::min(static_cast<int>(projectedX) + radius, width_ - 1);
@@ -172,27 +183,29 @@ private:
                     const float newDepth = static_cast<float>(depth);
                     if (oldDepth < 1e-3f || newDepth < oldDepth) {
                         depthMat_.at<float>(y, x) = newDepth;
-                        intensityMat_.at<uint8_t>(y, x) = static_cast<uint8_t>(intensity);
+                        intensityMat_.at<uint8_t>(y, x) = intensity;
                     }
                 }
             }
         }
 
         if (publishDepth) {
+            lastDepthPublish_ = now;
             cv_bridge::CvImage image;
             image.header.stamp = lastOdomStamp_;
             image.header.frame_id = "world";
             image.encoding = sensor_msgs::image_encodings::TYPE_32FC1;
-            image.image = depthMat_.clone();
+            image.image = depthMat_;
             depthPub_->publish(*image.toImageMsg());
         }
 
         if (publishImage) {
+            lastImagePublish_ = now;
             cv_bridge::CvImage image;
             image.header.stamp = lastOdomStamp_;
             image.header.frame_id = "camera";
             image.encoding = sensor_msgs::image_encodings::MONO8;
-            image.image = intensityMat_.clone();
+            image.image = intensityMat_;
             imagePub_->publish(*image.toImageMsg());
         }
     }
@@ -231,10 +244,16 @@ private:
     Eigen::Matrix4d cam02body_{Eigen::Matrix4d::Identity()};
     Eigen::Matrix4d cam2world_{Eigen::Matrix4d::Identity()};
     Eigen::Quaterniond cam2worldQuat_{Eigen::Quaterniond::Identity()};
+    Eigen::Matrix3d Rcw_{Eigen::Matrix3d::Identity()};
+    Eigen::Vector3d tcw_{Eigen::Vector3d::Zero()};
+    Eigen::Vector3d cameraPos_{Eigen::Vector3d::Zero()};
     rclcpp::Time lastOdomStamp_;
     pcl::PointCloud<pcl::PointXYZ> cloudIn_;
+    std::vector<uint8_t> pointIntensity_;
     cv::Mat depthMat_;
     cv::Mat intensityMat_;
+    double lastDepthPublish_{-1.0};
+    double lastImagePublish_{-1.0};
     bool hasGlobalMap_{false};
     bool hasOdom_{false};
 
@@ -244,7 +263,6 @@ private:
     rclcpp::Publisher<sensor_msgs::msg::Image>::SharedPtr imagePub_;
     rclcpp::Publisher<geometry_msgs::msg::PoseStamped>::SharedPtr sensorPosePub_;
     rclcpp::TimerBase::SharedPtr sensingTimer_;
-    rclcpp::TimerBase::SharedPtr imageTimer_;
     rclcpp::TimerBase::SharedPtr poseTimer_;
 };
 

@@ -203,7 +203,6 @@ TEST_F(FastPlannerTest, KinodynamicReplanReachesGoal) {
     ASSERT_TRUE(result.succeeded());
     ASSERT_TRUE(planner_->localTrajectory().valid());
     EXPECT_GT(planner_->localTrajectory().duration, 1.0);
-    EXPECT_FALSE(planner_->planningData().kinoPath.empty());
 
     const Eigen::Vector3d endPosition(planner_->localTrajectory().position.evalt(
         planner_->localTrajectory().duration).head<3>());

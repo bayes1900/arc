@@ -12,8 +12,7 @@ namespace arc {
 class BSplineOptimizer {
 public:
     BSplineOptimizer(rclcpp::Node::SharedPtr node, const SdfMap& map)
-        : node_(node)
-        , params_(std::move(node))
+        : params_(std::move(node))
         , map_(map)
         , cost_(params_, map_)
     {}
@@ -68,6 +67,8 @@ public:
         context.optimizeInterval = optimizeInterval;
         context.bestCost = initialCost;
         context.bestVariables = variables;
+        context.points.resize(numPoints, 3);
+        context.pointGradient.resize(numPoints, 3);
 
         nlopt::opt optimizer(nlopt::LD_MMA, variableCount);
         optimizer.set_min_objective(costFunction_, &context);
@@ -159,18 +160,20 @@ private:
         bool optimizeInterval{false};
         double bestCost{std::numeric_limits<double>::max()};
         std::vector<double> bestVariables;
+        Eigen::MatrixXd points;
+        Eigen::MatrixXd pointGradient;
         int iterations{0};
     };
     static double costFunction_(const std::vector<double>& variables, std::vector<double>& gradient, void* data) {
         auto* context = static_cast<EvalContext*>(data);
-        Eigen::MatrixXd points(context->numPoints, 3);
+        Eigen::MatrixXd& points = context->points;
         for (int i = 0; i < context->numPoints; ++ i) {
             for (int j = 0; j < 3; ++j) {
                 points(i, j) = variables[3 * i + j];
             }
         }
         const double interval = context->optimizeInterval ? variables.back() : context->fixedInterval;
-        Eigen::MatrixXd pointGradient;
+        Eigen::MatrixXd& pointGradient = context->pointGradient;
         double timeGradient = 0.0;
         double cost = context->cost->evaluate(*context->request, points, interval, context->ptAvgDist, pointGradient, timeGradient);
         if (!std::isfinite(cost)) {
@@ -202,7 +205,6 @@ private:
     }
 
 private:
-    rclcpp::Node::SharedPtr node_;
     BSplineOptParams params_;
     const SdfMap& map_;
     BSplineCost cost_;

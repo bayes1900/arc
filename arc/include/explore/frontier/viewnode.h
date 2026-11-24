@@ -8,9 +8,7 @@ namespace arc {
 
 struct ViewNodeParams {
     double vm{1.5};
-    double am{1.0};
     double yd{80.0 * 3.14159265358979323846 / 180.0};
-    double ydd{90.0 * 3.14159265358979323846 / 180.0};
     double wDir{1.5};
 
     double noPathPenaltyFactor{10.0};

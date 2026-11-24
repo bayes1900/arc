@@ -32,7 +32,6 @@ exploration_node:
     frontier:
       clusterMin: 100
       clusterSizeXY: 2.0
-      clusterSizeZ: 10.0
       minCandidateDist: 0.5
       minCandidateClearance: 0.21
       candidateDphi: 0.261799
@@ -50,7 +49,6 @@ exploration_node:
       consistentCost: -5.0
       consistentCost2: 8.0
     exploration:
-      refineLocal: true
       refinedNum: 7
       refinedRadius: 5.0
       topViewNum: 15
@@ -58,7 +56,6 @@ exploration_node:
       droneId: 1
       droneNum: 1
       initPlanNum: 2
-      relaxTime: 0.3
       replanTime: 0.2
       radiusFar: 7.0
       radiusClose: 1.5
@@ -90,9 +87,7 @@ exploration_node:
       maxNodes: 1000000
     viewpoint:
       vm: 1.5
-      am: 1.0
       yd: 1.396263
-      ydd: 1.570796
       wDir: 1.5
       noPathPenaltyFactor: 10.0
       minNoPathPenaltyLength: 100.0

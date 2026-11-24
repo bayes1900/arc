@@ -15,6 +15,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <deque>
 #include <vector>
 
 namespace arc {
@@ -175,7 +176,7 @@ private:
                 travelTrajectory_.push_back(position);
                 travelDirty_ = true;
                 if (travelTrajectory_.size() > 20000) {
-                    travelTrajectory_.erase(travelTrajectory_.begin());
+                    travelTrajectory_.pop_front();
                 }
             }
         }
@@ -251,8 +252,10 @@ private:
         marker.scale.x = 0.05;
         marker.scale.y = 0.05;
         marker.scale.z = 0.05;
-        marker.points.reserve(travelTrajectory_.size());
-        for (const auto& point : travelTrajectory_) {
+        const size_t stride = std::max<size_t>(1, travelTrajectory_.size() / 4000);
+        marker.points.reserve(travelTrajectory_.size() / stride + 1);
+        for (size_t i = 0; i < travelTrajectory_.size(); i += stride) {
+            const auto& point = travelTrajectory_[i];
             geometry_msgs::msg::Point markerPoint;
             markerPoint.x = point(0);
             markerPoint.y = point(1);
@@ -277,7 +280,7 @@ private:
     Eigen::Vector3d commandPosition_{Eigen::Vector3d::Zero()};
     LocalTrajectory trajectory_;
     FovModel fov_;
-    std::vector<Eigen::Vector3d> travelTrajectory_;
+    std::deque<Eigen::Vector3d> travelTrajectory_;
 
     rclcpp::Subscription<arcmsgs::msg::SwarmTrajectory>::SharedPtr trajectorySub_;
     rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr odomSub_;

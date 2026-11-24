@@ -126,15 +126,6 @@ public:
     void setMultiMapManager(MultiMapManager* multiMap) {
         multiMap_ = multiMap;
     }
-    void buildGridTour(const std::vector<int>& ids, std::vector<Eigen::Vector3d>& tour) const {
-        tour.clear();
-        tour.reserve(ids.size());
-        for (int id : ids) {
-            if (id >= 0 && id < static_cast<int>(grids_.size())) {
-                tour.push_back(grids_[id].center);
-            }
-        }
-    }
     void frontiersInGrid(int gridId, std::vector<int>& frontierIndices) const {
         frontierIndices.clear();
         if (gridId < 0 || gridId >= static_cast<int>(grids_.size())) {

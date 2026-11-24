@@ -228,7 +228,6 @@ def launchNodes(context):
                 ('/exploration/metrics', '/exploration/metrics_{0}'.format(droneId)),
                 ('/exploration/occupancy_local', '/sdf_map/occupancy_local_{0}'.format(droneId)),
                 ('/exploration/occupancy_all', '/sdf_map/occupancy_all_{0}'.format(droneId)),
-                ('/exploration/unknown', '/sdf_map/unknown_{0}'.format(droneId)),
                 ('/exploration/occupancy_inflate', '/sdf_map/occupancy_local_inflate_{0}'.format(droneId)),
                 ('/exploration/depth_cloud', '/sdf_map/depth_cloud_{0}'.format(droneId)),
                 ('/planning_vis/frontier', '/planning_vis/frontier_{0}'.format(droneId)),

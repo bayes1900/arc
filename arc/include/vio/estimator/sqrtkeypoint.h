@@ -68,7 +68,6 @@ public:
     void marginalize(
         const std::map<int64_t, int>& numPointsConnected, const std::unordered_set<KeypointId>& lostLandmarks);
     void optimize();
-    void debugFinalize() override;
     void logMargNullspace();
     Eigen::VectorXd checkMargNullspace() const;
     Eigen::VectorXd checkMargEigenvalues() const;
@@ -147,8 +146,6 @@ private:
     constexpr static double INITIAL_VEE = double(2.0);
     double lambda_, minLambda_, maxLambda_, lambdaVee_;
     std::shared_ptr<std::thread> processingThread_;
-    ExecutionStats statsAll_;
-    ExecutionStats statsSums_;
 };
 
 inline SqrtKeypointVioEstimator::SqrtKeypointVioEstimator(
@@ -336,8 +333,6 @@ inline bool SqrtKeypointVioEstimator::measure(
     if (!optFlowMeas) {
         throw std::invalid_argument("null optical flow result");
     }
-    statsSums_.add("frameId", optFlowMeas->tNs).setFormat("none");
-    Timer tTotal;
     if (meas.get()) {
         ensure(frameStates[lastStateTNs_].getState().tNs == meas->getStartTNs(), "VIO check failed");
         ensure(optFlowMeas->tNs == meas->getDtNs() + meas->getStartTNs(), "VIO check failed");
@@ -480,19 +475,16 @@ inline bool SqrtKeypointVioEstimator::measure(
         outVisQueue->push(data);
     }
     lastProcessedTNs = lastStateTNs_;
-    statsSums_.add("measure", tTotal.elapsed()).setFormat("ms");
     return true;
 }
 inline void SqrtKeypointVioEstimator::logMargNullspace() {
     nullspaceMargData_.order = margData_.order;
     if (config_.vioDebug) {
         std::cout << "======== Marg nullspace ==========" << std::endl;
-        statsSums_.add("marg_ns", checkMargNullspace());
+        checkMargNullspace();
+        checkMargEigenvalues();
         std::cout << "=================================" << std::endl;
-    } else {
-        statsSums_.add("marg_ns", checkMargNullspace());
     }
-    statsSums_.add("marg_ev", checkMargEigenvalues());
 }
 inline Eigen::VectorXd SqrtKeypointVioEstimator::checkMargNullspace() const {
     return checkNullspace(nullspaceMargData_, frameStates, framePoses, config_.vioDebug);
@@ -504,7 +496,6 @@ inline void SqrtKeypointVioEstimator::marginalize(
     const std::map<int64_t, int>& numPointsConnected, const std::unordered_set<KeypointId>& lostLandmarks) {
     if (!optStarted_)
         return;
-    Timer tTotal;
     if (framePoses.size() > maxKfs_ || frameStates.size() >= maxStates_) {
         const int statesToRemove = frameStates.size() - maxStates_ + 1;
         auto it = frameStates.cbegin();
@@ -590,13 +581,11 @@ inline void SqrtKeypointVioEstimator::marginalize(
             std::cout << "state_to_marg_vel_bias.size() " << statesToMargVelBias.size() << std::endl;
             std::cout << "kfs_to_marg.size() " << kfsToMarg.size() << std::endl;
         }
-        Timer tActualMarg;
         size_t asize = aom.totalSize;
         bool isLinSqrt = isLinearizationSqrt(config_.vioLinearizationType);
         MatXd Q2Jp_or_H;
         VecXd Q2r_or_b;
         {
-            Timer tLinearize;
             LinearizationBase::Options lqrOptions;
             lqrOptions.lbOptions.huberParameter = huberThresh;
             lqrOptions.lbOptions.obsStdDev = obsStdDev;
@@ -618,7 +607,6 @@ inline void SqrtKeypointVioEstimator::marginalize(
             } else {
                 lqr->getDenseHB(Q2Jp_or_H, Q2r_or_b);
             }
-            statsSums_.add("marg_linearize", tLinearize.elapsed()).setFormat("ms");
         }
         if (outMargQueue && !kfsToMarg.empty()) {
             {
@@ -732,7 +720,6 @@ inline void SqrtKeypointVioEstimator::marginalize(
         MatXd marg_H_new;
         VecXd margBNew;
         {
-            Timer t;
             if (isLinSqrt && margData_.isSqrt) {
                 MargHelper::marginalizeHelperSqrtToSqrt(
                     Q2Jp_or_H, Q2r_or_b, idxToKeep, idxToMarg, marg_H_new, margBNew);
@@ -743,7 +730,6 @@ inline void SqrtKeypointVioEstimator::marginalize(
                 MargHelper::marginalizeHelperSqToSq(
                     Q2Jp_or_H, Q2r_or_b, idxToKeep, idxToMarg, marg_H_new, margBNew);
             }
-            statsSums_.add("marg_helper", t.elapsed()).setFormat("ms");
         }
         {
             ensure(frameStates.at(lastStateToMarg).isLinearized() == false, "VIO check failed");
@@ -793,17 +779,10 @@ inline void SqrtKeypointVioEstimator::marginalize(
             computeDelta(margData_.order, delta);
             nullspaceMargData_.b -= nullspaceMargData_.h * delta;
         }
-        statsSums_.add("marg", tActualMarg.elapsed()).setFormat("ms");
-        if (config_.vioDebug) {
-            std::cout << "marginalizaon done!!" << std::endl;
-        }
         if (config_.vioDebug || config_.vioExtendedLogging) {
-            Timer t;
             logMargNullspace();
-            statsSums_.add("marg_log", t.elapsed()).setFormat("ms");
         }
     }
-    statsSums_.add("marginalize", tTotal.elapsed()).setFormat("ms");
 }
 inline void SqrtKeypointVioEstimator::optimize() {
     if (config_.vioDebug) {
@@ -999,8 +978,6 @@ inline void SqrtKeypointVioEstimator::optimize() {
         stats.add("optimize", timerTotal.elapsed()).setFormat("ms");
         stats.add("num_it", it).setFormat("count");
         stats.add("num_it_rejected", itRejected).setFormat("count");
-        statsAll_.mergeAll(stats);
-        statsSums_.mergeSums(stats);
         if (config_.vioDebug) {
             if (!converged) {
                 if (terminated) {
@@ -1018,12 +995,6 @@ inline void SqrtKeypointVioEstimator::optimizeAndMarg(
     const std::map<int64_t, int>& numPointsConnected, const std::unordered_set<KeypointId>& lostLandmarks) {
     optimize();
     marginalize(numPointsConnected, lostLandmarks);
-}
-inline void SqrtKeypointVioEstimator::debugFinalize() {
-    std::cout << "=== stats all ===\n";
-    statsAll_.print();
-    std::cout << "=== stats sums ===\n";
-    statsSums_.print();
 }
 
 } // arc

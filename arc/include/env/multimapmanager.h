@@ -64,14 +64,15 @@ public:
     }
     void updateMapChunk(const std::vector<size_t>& adrs) {
         adrBuffer_.insert(adrBuffer_.end(), adrs.begin(), adrs.end());
-        while (adrBuffer_.size() > params_.chunkSize) {
+        size_t readPos = 0;
+        while (adrBuffer_.size() - readPos > params_.chunkSize) {
             MapChunk chunk;
-            chunk.voxelAdrs.assign(adrBuffer_.begin(), adrBuffer_.begin() + params_.chunkSize);
+            chunk.voxelAdrs.assign(adrBuffer_.begin() + readPos, adrBuffer_.begin() + readPos + params_.chunkSize);
             chunk.idx = static_cast<uint32_t>(multiMapChunks_[params_.droneId - 1].chunks.size() + 1);
             chunk.needQuery = true;
             chunk.empty = false;
             multiMapChunks_[params_.droneId - 1].chunks.push_back(std::move(chunk));
-            adrBuffer_.erase(adrBuffer_.begin(), adrBuffer_.begin() + params_.chunkSize);
+            readPos += params_.chunkSize;
 
             std::vector<int>& idxList = multiMapChunks_[params_.droneId - 1].idxList;
             if (idxList.empty()) {
@@ -80,6 +81,9 @@ public:
             } else {
                 idxList.back() = static_cast<int>(multiMapChunks_[params_.droneId - 1].chunks.back().idx);
             }
+        }
+        if (readPos > 0) {
+            adrBuffer_.erase(adrBuffer_.begin(), adrBuffer_.begin() + readPos);
         }
     }
     ChunkStamps buildStamp(double time) const {
@@ -120,7 +124,7 @@ public:
         }
         return outgoing;
     }
-    void receiveChunk(const ChunkData& chunk) {
+    void receiveChunk(ChunkData chunk) {
         if (chunk.fromDroneId == params_.droneId) {
             return;
         }
@@ -133,7 +137,7 @@ public:
         if (received.find(key) != received.end()) {
             return;
         }
-        chunkBuffer_[chunk.chunkDroneId - 1].push_back(chunk);
+        chunkBuffer_[chunk.chunkDroneId - 1].push_back(std::move(chunk));
         received[key] = 1;
     }
     void processReceivedChunks() {
@@ -168,7 +172,7 @@ public:
                     chunksData.chunks[j].needQuery = false;
                 }
             }
-            for (const ChunkData& data : buffer) {
+            for (ChunkData& data : buffer) {
                 if (data.idx == 0 || data.idx > chunksData.chunks.size()) {
                     continue;
                 }
@@ -176,8 +180,8 @@ public:
                 if (!chunk.empty) {
                     continue;
                 }
-                chunk.voxelAdrs = data.voxelAdrs;
-                chunk.voxelOcc = data.voxelOcc;
+                chunk.voxelAdrs = std::move(data.voxelAdrs);
+                chunk.voxelOcc = std::move(data.voxelOcc);
                 chunk.idx = data.idx;
                 chunk.empty = false;
                 chunk.needQuery = false;

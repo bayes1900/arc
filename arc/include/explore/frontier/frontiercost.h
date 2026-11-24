@@ -15,14 +15,26 @@ public:
     void refresh(std::vector<Frontier>& frontiers, const std::vector<int>& removedFrontierIndices) {
         if (!removedFrontierIndices.empty()) {
             for (auto& frontier : frontiers) {
-                for (auto iter = removedFrontierIndices.rbegin(); iter != removedFrontierIndices.rend(); ++ iter) {
-                    const size_t index = static_cast<size_t>(*iter);
-                    if (index >= frontier.edgeCosts.size()) {
+                size_t write = 0;
+                size_t removePos = 0;
+                const size_t count = frontier.edgeCosts.size();
+                for (size_t read = 0; read < count; ++ read) {
+                    while (removePos < removedFrontierIndices.size() &&
+                           static_cast<size_t>(removedFrontierIndices[removePos]) < read) {
+                        ++ removePos;
+                    }
+                    if (removePos < removedFrontierIndices.size() &&
+                        static_cast<size_t>(removedFrontierIndices[removePos]) == read) {
                         continue;
                     }
-                    frontier.edgeCosts.erase(frontier.edgeCosts.begin() + index);
-                    frontier.edgePaths.erase(frontier.edgePaths.begin() + index);
+                    if (write != read) {
+                        frontier.edgeCosts[write] = frontier.edgeCosts[read];
+                        frontier.edgePaths[write] = std::move(frontier.edgePaths[read]);
+                    }
+                    ++ write;
                 }
+                frontier.edgeCosts.resize(write);
+                frontier.edgePaths.resize(write);
             }
         }
         for (size_t i = 0; i < frontiers.size(); ++ i) {

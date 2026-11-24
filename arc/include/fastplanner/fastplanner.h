@@ -85,7 +85,6 @@ public:
             );
             return result;
         }
-        planningData_.kinoPath = kinoAstar_.getKinoTraj(0.01);
         stats_.searchTime = result.searchTime;
 
         double interval = options_.controlPointDistance / options_.kino.maxVel;
@@ -103,8 +102,7 @@ public:
         }
         BSpline initialTrajectory(bsplineOptions_);
         initialTrajectory.setUniformBSpline(controlPoints, 3, interval);
-        planningData_.initialLocalSegment = initialTrajectory;
-        planningData_.localStartEndDerivative = boundaryDerivatives;
+
 
         std::vector<Eigen::Vector3d> startState;
         std::vector<Eigen::Vector3d> endState;
@@ -125,7 +123,7 @@ public:
             result.code = PlannerResult::TRAJECTORYINVALID;
             return result;
         }
-        planningData_.controlPoints = controlPoints;
+
         updateTrajectoryInfo_();
         result.code = PlannerResult::SUCCESS;
         return result;
@@ -182,8 +180,7 @@ public:
         }
         BSpline initialTrajectory(bsplineOptions_);
         initialTrajectory.setUniformBSpline(controlPoints, 3, interval);
-        planningData_.initialLocalSegment = initialTrajectory;
-        planningData_.localStartEndDerivative = boundaryDerivatives;
+
 
         std::vector<Eigen::Vector3d> startState;
         std::vector<Eigen::Vector3d> endState;
@@ -206,7 +203,7 @@ public:
             result.code = PlannerResult::TRAJECTORYINVALID;
             return result;
         }
-        planningData_.controlPoints = controlPoints;
+
         updateTrajectoryInfo_();
         result.code = PlannerResult::SUCCESS;
         return result;
@@ -307,8 +304,7 @@ public:
         localTrajectory_.yaw.setUniformBSpline(yawPoints, 3, interval);
         localTrajectory_.yawRate = localTrajectory_.yaw.getDerivativeBSpline();
         localTrajectory_.yawAcceleration = localTrajectory_.yawRate.getDerivativeBSpline();
-        planningData_.dtYaw = interval;
-        planningData_.pathYaw = waypoints;
+
         result.code = PlannerResult::SUCCESS;
         return result;
     }
@@ -352,16 +348,6 @@ public:
         }
         swarm_.trajectories[static_cast<size_t>(droneId - 1)] = trajectory;
         swarm_.receiveFlags[static_cast<size_t>(droneId - 1)] = trajectory.valid();
-    }
-    void clearSwarmTrajectory(int droneId) {
-        if (droneId <= 0 || droneId > swarm_.droneNum) {
-            return;
-        }
-        swarm_.trajectories[static_cast<size_t>(droneId - 1)] = LocalTrajectory();
-        swarm_.receiveFlags[static_cast<size_t>(droneId - 1)] = false;
-    }
-    const SwarmTrajectories& swarmTrajectories() const {
-        return swarm_;
     }
     bool checkSwarmCollision(int droneId, double& distance) const {
         distance = std::numeric_limits<double>::max();
@@ -422,7 +408,6 @@ public:
     const FastPlannerOptions& options() const { return options_; }
     const PlannerStats& stats() const { return stats_; }
     const LocalTrajectory& localTrajectory() const { return localTrajectory_; }
-    const PlanningData& planningData() const { return planningData_; }
     void setLocalTrajectoryStartTime(double startTime) { localTrajectory_.startTime = startTime; }
 
 private:
@@ -488,8 +473,6 @@ private:
     BSplineOptions yawBsplineOptions_;
     PlannerStats stats_;
     LocalTrajectory localTrajectory_;
-    GlobalTrajectory globalTrajectory_;
-    PlanningData planningData_;
     SwarmTrajectories swarm_;
     rclcpp::Node::SharedPtr node_;
     SdfMap& map_;

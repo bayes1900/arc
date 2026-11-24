@@ -48,14 +48,6 @@ public:
         advance_();
         return true;
     }
-    bool nextPos(Eigen::Vector3d& pos) {
-        pos = mp_.i2p(Eigen::Vector3i(x_, y_, z_));
-        if (x_ == endX_ && y_ == endY_ && z_ == endZ_) {
-            return false;
-        }
-        advance_();
-        return true;
-    }
 
 private:
     void advance_() {

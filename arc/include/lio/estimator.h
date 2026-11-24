@@ -84,12 +84,6 @@ public:
         mapIncremental_();
         return true;
     }
-    const LioState& state() const {
-        return state_;
-    }
-    MatXd covariance() const {
-        return kf_.covariance();
-    }
     Vec3d position() const {
         return state_.pos;
     }

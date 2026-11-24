@@ -20,7 +20,6 @@ private:
     rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr mapPub_;
     sensor_msgs::msg::PointCloud2 mapMsg_;
     std::string pcdPath_;
-    std::string frameId_;
     bool addGround_{true};
 };
 

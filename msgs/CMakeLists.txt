@@ -18,7 +18,6 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "msg/IdxList.msg"
   "msg/ChunkStamps.msg"
   "msg/ChunkData.msg"
-  "msg/GridTour.msg"
   "msg/SwarmTrajectory.msg"
   "msg/ExplorationEvent.msg"
   "msg/ExplorationMetrics.msg"

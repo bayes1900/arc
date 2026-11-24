@@ -82,7 +82,7 @@ public:
         boxMin_ = boxMin;
         boxMax_ = boxMax;
     }
-    std::vector<Eigen::Vector3d> getPath() const {
+    const std::vector<Eigen::Vector3d>& getPath() const {
         return path_;
     }
     bool isLineFree(const Eigen::Vector3d& p1, const Eigen::Vector3d& p2) const {

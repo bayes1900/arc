@@ -162,7 +162,6 @@ private:
 
         frontierParams_.clusterMin = node_->declare_parameter<int>("frontier.clusterMin", frontierParams_.clusterMin);
         frontierParams_.clusterSizeXY = node_->declare_parameter<double>("frontier.clusterSizeXY", frontierParams_.clusterSizeXY);
-        frontierParams_.clusterSizeZ = node_->declare_parameter<double>("frontier.clusterSizeZ", frontierParams_.clusterSizeZ);
         frontierParams_.minCandidateDist = node_->declare_parameter<double>("frontier.minCandidateDist", frontierParams_.minCandidateDist);
         frontierParams_.minCandidateClearance = node_->declare_parameter<double>("frontier.minCandidateClearance", frontierParams_.minCandidateClearance);
         frontierParams_.candidateDphi = node_->declare_parameter<double>("frontier.candidateDphi", frontierParams_.candidateDphi);
@@ -180,7 +179,6 @@ private:
         gridParams_.consistentCost = node_->declare_parameter<double>("grid.consistentCost", gridParams_.consistentCost);
         gridParams_.consistentCost2 = node_->declare_parameter<double>("grid.consistentCost2", gridParams_.consistentCost2);
 
-        explorationParams_.refineLocal = node_->declare_parameter<bool>("exploration.refineLocal", explorationParams_.refineLocal);
         explorationParams_.refinedNum = node_->declare_parameter<int>("exploration.refinedNum", explorationParams_.refinedNum);
         explorationParams_.refinedRadius = node_->declare_parameter<double>("exploration.refinedRadius", explorationParams_.refinedRadius);
         explorationParams_.topViewNum = node_->declare_parameter<int>("exploration.topViewNum", explorationParams_.topViewNum);
@@ -188,7 +186,6 @@ private:
         explorationParams_.droneId = node_->declare_parameter<int>("exploration.droneId", explorationParams_.droneId);
         explorationParams_.droneNum = node_->declare_parameter<int>("exploration.droneNum", explorationParams_.droneNum);
         explorationParams_.initPlanNum = node_->declare_parameter<int>("exploration.initPlanNum", explorationParams_.initPlanNum);
-        explorationParams_.relaxTime = node_->declare_parameter<double>("exploration.relaxTime", explorationParams_.relaxTime);
         explorationParams_.replanTime = node_->declare_parameter<double>("exploration.replanTime", explorationParams_.replanTime);
         explorationParams_.radiusFar = node_->declare_parameter<double>("exploration.radiusFar", explorationParams_.radiusFar);
         explorationParams_.radiusClose = node_->declare_parameter<double>("exploration.radiusClose", explorationParams_.radiusClose);
@@ -246,9 +243,7 @@ private:
         viewAstarOptions_.maxNodes = static_cast<size_t>(node_->declare_parameter<int>("astarView.maxNodes", static_cast<int>(viewAstarOptions_.maxNodes)));
 
         viewNodeParams_.vm = node_->declare_parameter<double>("viewpoint.vm", viewNodeParams_.vm);
-        viewNodeParams_.am = node_->declare_parameter<double>("viewpoint.am", viewNodeParams_.am);
         viewNodeParams_.yd = node_->declare_parameter<double>("viewpoint.yd", viewNodeParams_.yd);
-        viewNodeParams_.ydd = node_->declare_parameter<double>("viewpoint.ydd", viewNodeParams_.ydd);
         viewNodeParams_.wDir = node_->declare_parameter<double>("viewpoint.wDir", viewNodeParams_.wDir);
         viewNodeParams_.noPathPenaltyFactor = node_->declare_parameter<double>("viewpoint.noPathPenaltyFactor", viewNodeParams_.noPathPenaltyFactor);
         viewNodeParams_.minNoPathPenaltyLength = node_->declare_parameter<double>("viewpoint.minNoPathPenaltyLength", viewNodeParams_.minNoPathPenaltyLength);
@@ -327,7 +322,6 @@ private:
         statePub_ = node_->create_publisher<std_msgs::msg::String>("/exploration/state", 10);
         localOccupancyPub_ = node_->create_publisher<sensor_msgs::msg::PointCloud2>("/exploration/occupancy_local", 10);
         allOccupancyPub_ = node_->create_publisher<sensor_msgs::msg::PointCloud2>("/exploration/occupancy_all", 10);
-        unknownPub_ = node_->create_publisher<sensor_msgs::msg::PointCloud2>("/exploration/unknown", 10);
         inflatePub_ = node_->create_publisher<sensor_msgs::msg::PointCloud2>("/exploration/occupancy_inflate", 10);
         depthCloudPub_ = node_->create_publisher<sensor_msgs::msg::PointCloud2>("/exploration/depth_cloud", 10);
         droneStateSub_ = node_->create_subscription<arcmsgs::msg::DroneState>(
@@ -425,18 +419,21 @@ private:
         if (!map_.params().isInMap(cameraPos)) {
             return;
         }
-        cv_bridge::CvImagePtr imagePtr;
+        cv_bridge::CvImageConstPtr imagePtr;
         try {
-            imagePtr = cv_bridge::toCvCopy(image, image->encoding);
+            imagePtr = cv_bridge::toCvShare(image, image->encoding);
         } catch (const cv_bridge::Exception& error) {
             RCLCPP_ERROR(node_->get_logger(), "cv_bridge: %s", error.what());
             return;
         }
+        cv::Mat converted;
+        const cv::Mat* depthImage = &imagePtr->image;
         if (image->encoding == sensor_msgs::image_encodings::TYPE_32FC1) {
-            imagePtr->image.convertTo(imagePtr->image, CV_16UC1, projector_.scalingFactor());
+            imagePtr->image.convertTo(converted, CV_16UC1, projector_.scalingFactor());
+            depthImage = &converted;
         }
-        if (imagePtr->image.type() != CV_16UC1) {
-            RCLCPP_ERROR(node_->get_logger(), "unsupported depth image type: %d", imagePtr->image.type());
+        if (depthImage->type() != CV_16UC1) {
+            RCLCPP_ERROR(node_->get_logger(), "unsupported depth image type: %d", depthImage->type());
             return;
         }
         const Eigen::Quaterniond cameraQ(
@@ -446,7 +443,7 @@ private:
             pose->pose.orientation.z
         );
         const Eigen::Matrix3d cameraR = cameraQ.toRotationMatrix();
-        projector_.project(imagePtr->image, cameraPos, cameraR);
+        projector_.project(*depthImage, cameraPos, cameraR);
         map_.updateFramePoints(projector_.cloud(), projector_.size(), cameraPos);
         multiMap_->updateMapChunk(map_.takeNewVoxelIndexes());
         sensorReady_ = true;
@@ -766,24 +763,33 @@ private:
         params.boundIndex(localMin);
         params.boundIndex(localMax);
 
-        pcl::PointCloud<pcl::PointXYZ> localCloud;
-        pcl::PointCloud<pcl::PointXYZ> allCloud;
-        pcl::PointCloud<pcl::PointXYZ> inflateCloud;
+        pcl::PointCloud<pcl::PointXYZ>& localCloud = localCloud_;
+        pcl::PointCloud<pcl::PointXYZ>& allCloud = allCloud_;
+        pcl::PointCloud<pcl::PointXYZ>& inflateCloud = inflateCloud_;
+        localCloud.clear();
+        allCloud.clear();
+        inflateCloud.clear();
+
+        const double resolution = params.resolution;
+        const double originX = params.origin(0);
+        const double originY = params.origin(1);
+        const double originZ = params.origin(2);
         for (int x = localMin(0); x <= localMax(0); ++ x) {
+            const float px = static_cast<float>((x + 0.5) * resolution + originX);
             for (int y = localMin(1); y <= localMax(1); ++ y) {
-                for (int z = localMin(2); z <= localMax(2); ++ z) {
-                    const Eigen::Vector3i index(x, y, z);
-                    const Eigen::Vector3d position = params.i2p(index);
+                const float py = static_cast<float>((y + 0.5) * resolution + originY);
+                size_t base = params.getVoxelIdx(x, y, localMin(2));
+                for (int z = localMin(2); z <= localMax(2); ++ z, ++ base) {
                     const pcl::PointXYZ point(
-                        static_cast<float>(position(0)),
-                        static_cast<float>(position(1)),
-                        static_cast<float>(position(2))
+                        px,
+                        py,
+                        static_cast<float>((z + 0.5) * resolution + originZ)
                     );
-                    if (data.getOccupancy(index) == VoxelOccupancyCode::OCCUPIED) {
-                        localCloud.push_back(point);
-                    }
-                    if (data.getInflateOccupancy(index) == VoxelInflateOccupancyCode::OCCUPIED) {
+                    if (data.occupied[base]) {
                         inflateCloud.push_back(point);
+                    }
+                    if (data.occupancyLogits[base] > params.locc) {
+                        localCloud.push_back(point);
                     }
                 }
             }
@@ -794,16 +800,16 @@ private:
         params.boundIndex(allMin);
         params.boundIndex(allMax);
         for (int x = allMin(0); x <= allMax(0); ++ x) {
+            const float px = static_cast<float>((x + 0.5) * resolution + originX);
             for (int y = allMin(1); y <= allMax(1); ++ y) {
-                for (int z = allMin(2); z <= allMax(2); ++ z) {
-                    const Eigen::Vector3i index(x, y, z);
-                    const uint8_t occupancy = data.getOccupancy(index);
-                    if (occupancy == VoxelOccupancyCode::OCCUPIED) {
-                        const Eigen::Vector3d position = params.i2p(index);
+                const float py = static_cast<float>((y + 0.5) * resolution + originY);
+                size_t base = params.getVoxelIdx(x, y, allMin(2));
+                for (int z = allMin(2); z <= allMax(2); ++ z, ++ base) {
+                    if (data.occupancyLogits[base] > params.locc) {
                         allCloud.push_back(pcl::PointXYZ(
-                            static_cast<float>(position(0)),
-                            static_cast<float>(position(1)),
-                            static_cast<float>(position(2))
+                            px,
+                            py,
+                            static_cast<float>((z + 0.5) * resolution + originZ)
                         ));
                     }
                 }
@@ -951,8 +957,10 @@ private:
     rclcpp::Publisher<std_msgs::msg::String>::SharedPtr statePub_;
     rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr localOccupancyPub_;
     rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr allOccupancyPub_;
-    rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr unknownPub_;
     rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr inflatePub_;
+    pcl::PointCloud<pcl::PointXYZ> localCloud_;
+    pcl::PointCloud<pcl::PointXYZ> allCloud_;
+    pcl::PointCloud<pcl::PointXYZ> inflateCloud_;
     rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr depthCloudPub_;
     rclcpp::Subscription<arcmsgs::msg::DroneState>::SharedPtr droneStateSub_;
     rclcpp::Subscription<arcmsgs::msg::PairOpt>::SharedPtr pairOptSub_;

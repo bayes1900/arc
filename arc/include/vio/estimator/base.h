@@ -60,7 +60,6 @@ public:
             visionDataQueue.pop(d);
         }
     }
-    virtual void debugFinalize() {}
     virtual Sophus::SE3d getTWIInit() = 0;
     virtual void setMaxStates(size_t val) = 0;
     virtual void setMaxKfs(size_t val) = 0;

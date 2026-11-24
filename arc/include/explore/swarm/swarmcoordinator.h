@@ -260,9 +260,6 @@ public:
     const std::vector<int>& selfGridIds() const {
         return explorationData_.gridTour.assignedGridIds.values();
     }
-    bool waitingForResponse() const {
-        return waitingForResponse_;
-    }
     bool consumeReallocation() {
         const bool reallocated = reallocationEvent_;
         reallocationEvent_ = false;

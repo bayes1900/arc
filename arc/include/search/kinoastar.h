@@ -109,16 +109,6 @@ public:
         nodeNum_ = 0;
         iterNum_ = 0;
     }
-    void setBox(const Eigen::Vector3d& boxMin, const Eigen::Vector3d& boxMax) {
-        if ((boxMax.array() <= boxMin.array()).any()) {
-            return;
-        }
-        boxMin_ = boxMin;
-        boxMax_ = boxMax;
-    }
-    std::vector<Eigen::Vector3d> getPath() const {
-        return getKinoTraj(options_.pathSampleInterval);
-    }
     std::vector<Eigen::Vector3d> getKinoTraj(double deltaT) const {
         std::vector<Eigen::Vector3d> stateList;
         if (pathNodes_.empty()) {
@@ -222,14 +212,6 @@ public:
         boundaryDerivatives.push_back(endVel);
         boundaryDerivatives.push_back(startAcc);
         boundaryDerivatives.push_back(endAcc);
-    }
-    std::vector<KinoAstarNode*> getVisitedNodes() const {
-        std::vector<KinoAstarNode*> visited;
-        visited.reserve(nodeNum_);
-        for (size_t i = 0; i < nodeNum_; ++ i) {
-            visited.push_back(nodePool_[i]);
-        }
-        return visited;
     }
 
 public:

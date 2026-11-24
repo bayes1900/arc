@@ -11,7 +11,6 @@ struct ExplorationStatus {
 };
 
 struct ExplorationParams {
-    bool refineLocal{true};
     int refinedNum{7};
     double refinedRadius{5.0};
     int topViewNum{15};
@@ -21,7 +20,6 @@ struct ExplorationParams {
     int droneNum{1};
     int initPlanNum{2};
 
-    double relaxTime{1.0};
     double replanTime{0.2};
 
     double radiusFar{7.0};

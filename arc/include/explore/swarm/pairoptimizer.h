@@ -43,10 +43,6 @@ public:
         , allocator_(allocator)
         , params_(params)
     {}
-    int selectNeighbor(const SwarmState& state, int selfId, double now) const {
-        PairOptFailure failure = PairOptFailure::NONE;
-        return selectNeighborWithDiagnostics(state, selfId, now, failure);
-    }
     int selectNeighborWithDiagnostics(
         const SwarmState& state,
         int selfId,
