@@ -98,11 +98,21 @@ public:
         explicit ManualHeap(int maxCapacity = 100)
             : heap_(new PointTypeCmp[maxCapacity])
             , heapSize_(0)
-            , cap_(maxCapacity) {
+            , cap_(maxCapacity)
+            , owns_(true) {
+        }
+
+        ManualHeap(int maxCapacity, PointTypeCmp* storage)
+            : heap_(storage)
+            , heapSize_(0)
+            , cap_(maxCapacity)
+            , owns_(false) {
         }
 
         ~ManualHeap() {
-            delete[] heap_;
+            if (owns_) {
+                delete[] heap_;
+            }
         }
 
         void pop() {
@@ -114,7 +124,7 @@ public:
             moveDown_(0);
         }
 
-        PointTypeCmp top() {
+        const PointTypeCmp& top() {
             return heap_[0];
         }
 
@@ -172,6 +182,7 @@ public:
         PointTypeCmp* heap_;
         int heapSize_;
         int cap_;
+        bool owns_{true};
     };
 
     class ManualQueue {
@@ -272,19 +283,19 @@ private:
     void deleteByPoint_(KdTreeNode** root, PointType point, bool allowRebuild);
     void addByPoint_(KdTreeNode** root, PointType point, bool allowRebuild, int fatherAxis);
     void addByRange_(KdTreeNode** root, BoxPointType boxpoint, bool allowRebuild);
-    void search_(KdTreeNode* root, int kNearest, PointType point, ManualHeap& q, float maxDist);
+    void search_(KdTreeNode* root, int kNearest, const PointType& point, ManualHeap& q, float maxDist);
     void searchByRange_(KdTreeNode* root, BoxPointType boxpoint, PointVector& storage);
     void searchByRadius_(KdTreeNode* root, PointType point, float radius, PointVector& storage);
     bool criterionCheck_(KdTreeNode* root);
     void pushDown_(KdTreeNode* root);
     void update_(KdTreeNode* root);
     void deleteTreeNodes_(KdTreeNode** root);
-    bool samePoint_(PointType a, PointType b);
-    float calcDist_(PointType a, PointType b);
-    float calcBoxDist_(KdTreeNode* node, PointType point);
-    static bool pointCmpX_(PointType a, PointType b);
-    static bool pointCmpY_(PointType a, PointType b);
-    static bool pointCmpZ_(PointType a, PointType b);
+    bool samePoint_(const PointType& a, const PointType& b);
+    float calcDist_(const PointType& a, const PointType& b);
+    float calcBoxDist_(KdTreeNode* node, const PointType& point);
+    static bool pointCmpX_(const PointType& a, const PointType& b);
+    static bool pointCmpY_(const PointType& a, const PointType& b);
+    static bool pointCmpZ_(const PointType& a, const PointType& b);
 
 public:
     explicit KdTree(float deleteParam = 0.5f, float balanceParam = 0.6f, float boxLength = 0.2f);
@@ -310,7 +321,7 @@ public:
     void rootAlpha(float& alphaBal, float& alphaDel);
     void build(PointVector pointCloud);
     void nearestSearch(
-        PointType point,
+        const PointType& point,
         int kNearest,
         PointVector& nearestPoints,
         std::vector<float>& pointDistance,
@@ -744,11 +755,22 @@ void KdTree<PointType>::build(PointVector pointCloud)
 }
 
 template <typename PointType>
-void KdTree<PointType>::nearestSearch(PointType point, int kNearest, PointVector &nearestPoints, std::vector<float> &pointDistance, float maxDist)
+void KdTree<PointType>::nearestSearch(const PointType& point, int kNearest, PointVector &nearestPoints, std::vector<float> &pointDistance, float maxDist)
 {
-    ManualHeap q(2 * kNearest);
+    if (kNearest <= 0)
+    {
+        nearestPoints.clear();
+        pointDistance.clear();
+        return;
+    }
+    static thread_local std::vector<PointTypeCmp> heapStorage;
+    const int heapCapacity = 2 * kNearest;
+    if (static_cast<int>(heapStorage.size()) < heapCapacity)
+    {
+        heapStorage.resize(static_cast<size_t>(heapCapacity));
+    }
+    ManualHeap q(heapCapacity, heapStorage.data());
     q.clear();
-    std::vector<float>().swap(pointDistance);
     if (rebuildPtr_ == nullptr || *rebuildPtr_ != root_)
     {
         search_(root_, kNearest, point, q, maxDist);
@@ -1375,7 +1397,7 @@ void KdTree<PointType>::addByPoint_(KdTreeNode **root, PointType point, bool all
 }
 
 template <typename PointType>
-void KdTree<PointType>::search_(KdTreeNode *root, int kNearest, PointType point, ManualHeap &q, float maxDist)
+void KdTree<PointType>::search_(KdTreeNode *root, int kNearest, const PointType& point, ManualHeap &q, float maxDist)
 {
     if (root == nullptr || root->tree_deleted)
         return;
@@ -1990,13 +2012,13 @@ void KdTree<PointType>::deleteTreeNodes_(KdTreeNode **root)
 }
 
 template <typename PointType>
-bool KdTree<PointType>::samePoint_(PointType a, PointType b)
+bool KdTree<PointType>::samePoint_(const PointType& a, const PointType& b)
 {
     return (std::fabs(a.x - b.x) < EPS && std::fabs(a.y - b.y) < EPS && std::fabs(a.z - b.z) < EPS);
 }
 
 template <typename PointType>
-float KdTree<PointType>::calcDist_(PointType a, PointType b)
+float KdTree<PointType>::calcDist_(const PointType& a, const PointType& b)
 {
     float dist = 0.0f;
     dist = (a.x - b.x) * (a.x - b.x) + (a.y - b.y) * (a.y - b.y) + (a.z - b.z) * (a.z - b.z);
@@ -2004,7 +2026,7 @@ float KdTree<PointType>::calcDist_(PointType a, PointType b)
 }
 
 template <typename PointType>
-float KdTree<PointType>::calcBoxDist_(KdTreeNode *node, PointType point)
+float KdTree<PointType>::calcBoxDist_(KdTreeNode *node, const PointType& point)
 {
     if (node == nullptr)
         return INFINITY;
@@ -2025,11 +2047,11 @@ float KdTree<PointType>::calcBoxDist_(KdTreeNode *node, PointType point)
 }
 
 template <typename PointType>
-bool KdTree<PointType>::pointCmpX_(PointType a, PointType b) { return a.x < b.x; }
+bool KdTree<PointType>::pointCmpX_(const PointType& a, const PointType& b) { return a.x < b.x; }
 template <typename PointType>
-bool KdTree<PointType>::pointCmpY_(PointType a, PointType b) { return a.y < b.y; }
+bool KdTree<PointType>::pointCmpY_(const PointType& a, const PointType& b) { return a.y < b.y; }
 template <typename PointType>
-bool KdTree<PointType>::pointCmpZ_(PointType a, PointType b) { return a.z < b.z; }
+bool KdTree<PointType>::pointCmpZ_(const PointType& a, const PointType& b) { return a.z < b.z; }
 
 } // arc
 

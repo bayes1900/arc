@@ -102,8 +102,15 @@ public:
     LioCloud::Ptr registeredCloud() const {
         auto cloud = std::make_shared<LioCloud>();
         cloud->resize(featsUndistort_->size());
+        const Mat3d rotWL = state_.rot.toRotationMatrix() * state_.offsetRLI.toRotationMatrix();
+        const Vec3d transWL = state_.rot * state_.offsetTLI + state_.pos;
         for (size_t i = 0; i < featsUndistort_->size(); ++ i) {
-            cloud->points[i] = bodyToWorld_(featsUndistort_->points[i]);
+            const LioPoint& point = featsUndistort_->points[i];
+            const Vec3d world = rotWL * Vec3d(point.x, point.y, point.z) + transWL;
+            cloud->points[i].x = static_cast<float>(world.x());
+            cloud->points[i].y = static_cast<float>(world.y());
+            cloud->points[i].z = static_cast<float>(world.z());
+            cloud->points[i].intensity = point.intensity;
         }
         return cloud;
     }

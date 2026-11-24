@@ -12,9 +12,10 @@ namespace arc {
 
 class LioPipeline {
 public:
-    explicit LioPipeline(const LioConfig& config)
+    explicit LioPipeline(const LioConfig& config, bool publishCloud = true)
         : estimator_(config)
         , preprocessor_(config)
+        , publishCloud_(publishCloud)
     {}
     ~LioPipeline() {
         stop();
@@ -135,8 +136,9 @@ private:
             output.position = estimator_.position();
             output.rotation = estimator_.rotation();
             output.velocity = estimator_.velocity();
-            output.covariance = estimator_.covariance();
-            output.cloud = estimator_.registeredCloud();
+            if (publishCloud_) {
+                output.cloud = estimator_.registeredCloud();
+            }
             {
                 std::lock_guard<std::mutex> lock(outputMutex_);
                 output_ = std::move(output);
@@ -151,6 +153,7 @@ private:
 
     LioEstimator estimator_;
     PointPreprocessor preprocessor_;
+    bool publishCloud_{true};
 
     std::mutex mutex_;
     std::condition_variable condition_;

@@ -65,7 +65,7 @@ void LioNode::initRos_() {
         tfBroadcaster_ = std::make_unique<tf2_ros::TransformBroadcaster>(node_);
     }
 
-    pipeline_ = std::make_unique<LioPipeline>(config_);
+    pipeline_ = std::make_unique<LioPipeline>(config_, publishCloud_);
     pipeline_->start();
 
     publishTimer_ = node_->create_wall_timer(

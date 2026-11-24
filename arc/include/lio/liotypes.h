@@ -71,7 +71,6 @@ struct LioOutput {
     Vec3d position{Vec3d::Zero()};
     Mat3d rotation{Mat3d::Identity()};
     Vec3d velocity{Vec3d::Zero()};
-    MatXd covariance;
     LioCloud::Ptr cloud;
 };
 
