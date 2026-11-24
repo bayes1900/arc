@@ -3,32 +3,33 @@
 #include <base/base.h>
 #include <base/manifold/math.h>
 #include <base/manifold/so3.h>
+#include <lio/state.h>
 #include <omp.h>
 
 namespace arc {
 
-template <typename State, int ProcessNoiseDof, typename Input>
-class ManifoldEsekf {
+class LioEkf {
 public:
-    static constexpr int STATE_DOF = State::DOF;
-    static constexpr int STATE_DIM = State::DIM;
-    using Scalar = typename State::Scalar;
+    static constexpr int STATE_DOF = LioState::DOF;
+    static constexpr int STATE_DIM = LioState::DIM;
+    static constexpr int PROCESS_NOISE_DOF = 12;
+    using Scalar = double;
     using StateVector = Eigen::Matrix<Scalar, STATE_DOF, 1>;
     using Covariance = Eigen::Matrix<Scalar, STATE_DOF, STATE_DOF>;
-    using ProcessNoiseCovariance = Eigen::Matrix<Scalar, ProcessNoiseDof, ProcessNoiseDof>;
-    using ProcessModel = std::function<Eigen::Matrix<Scalar, STATE_DIM, 1>(State&, const Input&)>;
-    using ProcessMatrix1 = std::function<Eigen::Matrix<Scalar, STATE_DIM, STATE_DOF>(State&, const Input&)>;
-    using ProcessMatrix2 = std::function<Eigen::Matrix<Scalar, STATE_DIM, ProcessNoiseDof>(State&, const Input&)>;
+    using ProcessNoiseCovariance = Eigen::Matrix<Scalar, PROCESS_NOISE_DOF, PROCESS_NOISE_DOF>;
+    using ProcessModel = std::function<Eigen::Matrix<Scalar, STATE_DIM, 1>(LioState&, const LioInput&)>;
+    using ProcessMatrix1 = std::function<Eigen::Matrix<Scalar, STATE_DIM, STATE_DOF>(LioState&, const LioInput&)>;
+    using ProcessMatrix2 = std::function<Eigen::Matrix<Scalar, STATE_DIM, PROCESS_NOISE_DOF>(LioState&, const LioInput&)>;
 
     struct MeasurementData {
         bool valid{true};
         bool converge{true};
         Eigen::Matrix<Scalar, Eigen::Dynamic, 1> h;
-        Eigen::Matrix<Scalar, Eigen::Dynamic, 12> hX;
+        Eigen::Matrix<Scalar, Eigen::Dynamic, PROCESS_NOISE_DOF> hX;
     };
-    using MeasurementModel = std::function<void(State&, MeasurementData&)>;
+    using MeasurementModel = std::function<void(LioState&, MeasurementData&)>;
 
-    ManifoldEsekf()
+    LioEkf()
         : state_()
         , covariance_(Covariance::Identity())
     {
@@ -49,24 +50,24 @@ public:
         state_.buildStateIndex();
     }
 
-    void predict(Scalar dt, const ProcessNoiseCovariance& processNoise, const Input& input) {
+    void predict(Scalar dt, const ProcessNoiseCovariance& processNoise, const LioInput& input) {
         const Eigen::Matrix<Scalar, STATE_DIM, 1> f = processModel_(state_, input);
         const Eigen::Matrix<Scalar, STATE_DIM, STATE_DOF> fX = processMatrix1_(state_, input);
-        const Eigen::Matrix<Scalar, STATE_DIM, ProcessNoiseDof> fW = processMatrix2_(state_, input);
+        const Eigen::Matrix<Scalar, STATE_DIM, PROCESS_NOISE_DOF> fW = processMatrix2_(state_, input);
 
-        State stateBefore = state_;
+        LioState stateBefore = state_;
         state_.oPlus(f, dt);
 
         Covariance fX1 = Covariance::Identity();
         Covariance fXFinal = Covariance::Zero();
-        Eigen::Matrix<Scalar, STATE_DOF, ProcessNoiseDof> fWFinal =
-            Eigen::Matrix<Scalar, STATE_DOF, ProcessNoiseDof>::Zero();
+        Eigen::Matrix<Scalar, STATE_DOF, PROCESS_NOISE_DOF> fWFinal =
+            Eigen::Matrix<Scalar, STATE_DOF, PROCESS_NOISE_DOF>::Zero();
 
         for (const auto& entry : state_.vectorState()) {
             fXFinal.block(entry.index, 0, entry.dof, STATE_DOF) =
                 fX.block(entry.dimension, 0, entry.dof, STATE_DOF);
-            fWFinal.block(entry.index, 0, entry.dof, ProcessNoiseDof) =
-                fW.block(entry.dimension, 0, entry.dof, ProcessNoiseDof);
+            fWFinal.block(entry.index, 0, entry.dof, PROCESS_NOISE_DOF) =
+                fW.block(entry.dimension, 0, entry.dof, PROCESS_NOISE_DOF);
         }
 
         for (const auto& entry : state_.so3State()) {
@@ -77,13 +78,13 @@ public:
             // FAST_LIO uses scalar_type(1/2), which is integer zero. Keep the
             // identity rotation for numerical parity with upstream.
             const manifold::ManifoldSo3<Scalar> rotation = manifold::ManifoldSo3<Scalar>::exp(segment, Scalar(0));
-            fX1.template block<3, 3>(entry.index, entry.index) = rotation.toRotationMatrix();
+            fX1.block<3, 3>(entry.index, entry.index) = rotation.toRotationMatrix();
             const Eigen::Matrix<Scalar, 3, 3> a = manifold::aMatrix(segment);
             for (int i = 0; i < STATE_DOF; ++ i) {
-                fXFinal.template block<3, 1>(entry.index, i) = a * fX.template block<3, 1>(entry.dimension, i);
+                fXFinal.block<3, 1>(entry.index, i) = a * fX.block<3, 1>(entry.dimension, i);
             }
-            for (int i = 0; i < ProcessNoiseDof; ++ i) {
-                fWFinal.template block<3, 1>(entry.index, i) = a * fW.template block<3, 1>(entry.dimension, i);
+            for (int i = 0; i < PROCESS_NOISE_DOF; ++ i) {
+                fWFinal.block<3, 1>(entry.index, i) = a * fW.block<3, 1>(entry.dimension, i);
             }
         }
         for (const auto& entry : state_.s2State()) {
@@ -98,16 +99,16 @@ public:
             const Eigen::Matrix<Scalar, 2, 1> zero = Eigen::Matrix<Scalar, 2, 1>::Zero();
             state_.s2NxYy(nx, entry.index);
             stateBefore.s2Mx(mx, zero, entry.index);
-            fX1.template block<2, 2>(entry.index, entry.index) = nx * rotation.toRotationMatrix() * mx;
+            fX1.block<2, 2>(entry.index, entry.index) = nx * rotation.toRotationMatrix() * mx;
 
             Eigen::Matrix<Scalar, 3, 3> beforeHat;
             stateBefore.s2Hat(beforeHat, entry.index);
             const Eigen::Matrix<Scalar, 2, 3> residual = -nx * rotation.toRotationMatrix() * beforeHat * manifold::aMatrix(segment).transpose();
             for (int i = 0; i < STATE_DOF; ++ i) {
-                fXFinal.template block<2, 1>(entry.index, i) = residual * fX.template block<3, 1>(entry.dimension, i);
+                fXFinal.block<2, 1>(entry.index, i) = residual * fX.block<3, 1>(entry.dimension, i);
             }
-            for (int i = 0; i < ProcessNoiseDof; ++ i) {
-                fWFinal.template block<2, 1>(entry.index, i) = residual * fW.template block<3, 1>(entry.dimension, i);
+            for (int i = 0; i < PROCESS_NOISE_DOF; ++ i) {
+                fWFinal.block<2, 1>(entry.index, i) = residual * fW.block<3, 1>(entry.dimension, i);
             }
         }
         fX1 += fXFinal * dt;
@@ -115,7 +116,7 @@ public:
     }
     void update(Scalar measurementVariance, Scalar& solveTime) {
         MeasurementData measurement;
-        State statePropagated = state_;
+        LioState statePropagated = state_;
         Covariance covariancePropagated = covariance_;
         int dofMeasurement = 0;
         int convergenceCount = 0;
@@ -130,7 +131,7 @@ public:
             if (!measurement.valid) {
                 continue;
             }
-            const Eigen::Matrix<Scalar, Eigen::Dynamic, 12> hX = measurement.hX;
+            const Eigen::Matrix<Scalar, Eigen::Dynamic, PROCESS_NOISE_DOF> hX = measurement.hX;
             const double solveStart = omp_get_wtime();
             dofMeasurement = static_cast<int>(hX.rows());
 
@@ -146,12 +147,12 @@ public:
                 }
                 const Eigen::Matrix<Scalar, 3, 3> reparameterization =
                     manifold::aMatrix(segment).transpose();
-                dxNew.template block<3, 1>(entry.index, 0) = reparameterization * dxNew.template block<3, 1>(entry.index, 0);
+                dxNew.block<3, 1>(entry.index, 0) = reparameterization * dxNew.block<3, 1>(entry.index, 0);
                 for (int i = 0; i < STATE_DOF; ++ i) {
-                    covariance_.template block<3, 1>(entry.index, i) = reparameterization * covariance_.template block<3, 1>(entry.index, i);
+                    covariance_.block<3, 1>(entry.index, i) = reparameterization * covariance_.block<3, 1>(entry.index, i);
                 }
                 for (int i = 0; i < STATE_DOF; ++ i) {
-                    covariance_.template block<1, 3>(i, entry.index) = covariance_.template block<1, 3>(i, entry.index) * reparameterization.transpose();
+                    covariance_.block<1, 3>(i, entry.index) = covariance_.block<1, 3>(i, entry.index) * reparameterization.transpose();
                 }
             }
             for (const auto& entry : state_.s2State()) {
@@ -164,17 +165,17 @@ public:
                 state_.s2NxYy(nx, entry.index);
                 statePropagated.s2Mx(mx, segment, entry.index);
                 const Eigen::Matrix<Scalar, 2, 2> reparameterization = nx * mx;
-                dxNew.template block<2, 1>(entry.index, 0) = reparameterization * dxNew.template block<2, 1>(entry.index, 0);
+                dxNew.block<2, 1>(entry.index, 0) = reparameterization * dxNew.block<2, 1>(entry.index, 0);
                 for (int i = 0; i < STATE_DOF; ++ i) {
-                    covariance_.template block<2, 1>(entry.index, i) = reparameterization * covariance_.template block<2, 1>(entry.index, i);
+                    covariance_.block<2, 1>(entry.index, i) = reparameterization * covariance_.block<2, 1>(entry.index, i);
                 }
                 for (int i = 0; i < STATE_DOF; ++ i) {
-                    covariance_.template block<1, 2>(i, entry.index) = covariance_.template block<1, 2>(i, entry.index) * reparameterization.transpose();
+                    covariance_.block<1, 2>(i, entry.index) = covariance_.block<1, 2>(i, entry.index) * reparameterization.transpose();
                 }
             }
             if (STATE_DOF > dofMeasurement) {
                 Eigen::Matrix<Scalar, Eigen::Dynamic, Eigen::Dynamic> hXCurrent = Eigen::Matrix<Scalar, Eigen::Dynamic, Eigen::Dynamic>::Zero(dofMeasurement, STATE_DOF);
-                hXCurrent.topLeftCorner(dofMeasurement, 12) = hX;
+                hXCurrent.topLeftCorner(dofMeasurement, PROCESS_NOISE_DOF) = hX;
                 const Eigen::Matrix<Scalar, Eigen::Dynamic, Eigen::Dynamic> gain =
                     covariance_ * hXCurrent.transpose()
                     * (hXCurrent * covariance_ * hXCurrent.transpose() / measurementVariance
@@ -184,12 +185,12 @@ public:
                 kX = gain * hXCurrent;
             } else {
                 Covariance pTemp = (covariance_ / measurementVariance).inverse();
-                const Eigen::Matrix<Scalar, 12, 12> hth = hX.transpose() * hX;
-                pTemp.template block<12, 12>(0, 0) += hth;
+                const Eigen::Matrix<Scalar, PROCESS_NOISE_DOF, PROCESS_NOISE_DOF> hth = hX.transpose() * hX;
+                pTemp.block<PROCESS_NOISE_DOF, PROCESS_NOISE_DOF>(0, 0) += hth;
                 const Covariance pInv = pTemp.inverse();
-                kH = pInv.template block<STATE_DOF, 12>(0, 0) * hX.transpose() * measurement.h;
+                kH = pInv.block<STATE_DOF, PROCESS_NOISE_DOF>(0, 0) * hX.transpose() * measurement.h;
                 kX.setZero();
-                kX.template block<STATE_DOF, 12>(0, 0) = pInv.template block<STATE_DOF, 12>(0, 0) * hth;
+                kX.block<STATE_DOF, PROCESS_NOISE_DOF>(0, 0) = pInv.block<STATE_DOF, PROCESS_NOISE_DOF>(0, 0) * hth;
             }
 
             const StateVector dxCorrection = kH + (kX - Covariance::Identity()) * dxNew;
@@ -217,17 +218,16 @@ public:
                     const Eigen::Matrix<Scalar, 3, 3> reparameterization =
                         manifold::aMatrix(segment).transpose();
                     for (int i = 0; i < STATE_DOF; ++ i) {
-                        l.template block<3, 1>(entry.index, i) = reparameterization * covariance_.template block<3, 1>(entry.index, i);
+                        l.block<3, 1>(entry.index, i) = reparameterization * covariance_.block<3, 1>(entry.index, i);
                     }
-                    for (int i = 0; i < 12; ++ i) {
-                        kX.template block<3, 1>(entry.index, i) = reparameterization * kX.template block<3, 1>(entry.index, i);
+                    for (int i = 0; i < PROCESS_NOISE_DOF; ++ i) {
+                        kX.block<3, 1>(entry.index, i) = reparameterization * kX.block<3, 1>(entry.index, i);
                     }
                     for (int i = 0; i < STATE_DOF; ++ i) {
-                        l.template block<1, 3>(i, entry.index) = l.template block<1, 3>(i, entry.index) * reparameterization.transpose();
-                        covariance_.template block<1, 3>(i, entry.index) = covariance_.template block<1, 3>(i, entry.index) * reparameterization.transpose();
+                        l.block<1, 3>(i, entry.index) = l.block<1, 3>(i, entry.index) * reparameterization.transpose();
+                        covariance_.block<1, 3>(i, entry.index) = covariance_.block<1, 3>(i, entry.index) * reparameterization.transpose();
                     }
                 }
-
                 for (const auto& entry : state_.s2State()) {
                     Eigen::Matrix<Scalar, 2, 1> segment;
                     for (int i = 0; i < 2; ++ i) {
@@ -239,52 +239,39 @@ public:
                     statePropagated.s2Mx(mx, segment, entry.index);
                     const Eigen::Matrix<Scalar, 2, 2> reparameterization = nx * mx;
                     for (int i = 0; i < STATE_DOF; ++ i) {
-                        l.template block<2, 1>(entry.index, i) =
-                            reparameterization * covariance_.template block<2, 1>(entry.index, i);
+                        l.block<2, 1>(entry.index, i) = reparameterization * covariance_.block<2, 1>(entry.index, i);
                     }
-                    for (int i = 0; i < 12; ++ i) {
-                        kX.template block<2, 1>(entry.index, i) =
-                            reparameterization * kX.template block<2, 1>(entry.index, i);
+                    for (int i = 0; i < PROCESS_NOISE_DOF; ++ i) {
+                        kX.block<2, 1>(entry.index, i) = reparameterization * kX.block<2, 1>(entry.index, i);
                     }
                     for (int i = 0; i < STATE_DOF; ++ i) {
-                        l.template block<1, 2>(i, entry.index) =
-                            l.template block<1, 2>(i, entry.index)
-                                * reparameterization.transpose();
-                        covariance_.template block<1, 2>(i, entry.index) =
-                            covariance_.template block<1, 2>(i, entry.index)
-                                * reparameterization.transpose();
+                        l.block<1, 2>(i, entry.index) = l.block<1, 2>(i, entry.index) * reparameterization.transpose();
+                        covariance_.block<1, 2>(i, entry.index) = covariance_.block<1, 2>(i, entry.index) * reparameterization.transpose();
                     }
                 }
-
-                covariance_ = l
-                    - kX.template block<STATE_DOF, 12>(0, 0)
-                        * covariance_.template block<12, STATE_DOF>(0, 0);
+                covariance_ = l - kX.block<STATE_DOF, PROCESS_NOISE_DOF>(0, 0) * covariance_.block<PROCESS_NOISE_DOF, STATE_DOF>(0, 0);
                 solveTime += omp_get_wtime() - solveStart;
                 return;
             }
             solveTime += omp_get_wtime() - solveStart;
         }
     }
-
-    const State& state() const {
+    const LioState& state() const {
         return state_;
     }
-
     const Covariance& covariance() const {
         return covariance_;
     }
-
-    void setState(const State& state) {
+    void setState(const LioState& state) {
         state_ = state;
         state_.buildStateIndex();
     }
-
     void setCovariance(const Covariance& covariance) {
         covariance_ = covariance;
     }
 
 private:
-    State state_;
+    LioState state_;
     Covariance covariance_;
     ProcessModel processModel_;
     ProcessMatrix1 processMatrix1_;

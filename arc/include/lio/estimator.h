@@ -184,7 +184,7 @@ private:
 
                 Eigen::Matrix<float, 4, 1> plane;
                 pointSelectedSurf_[static_cast<size_t>(i)] = false;
-                if (estiPlane<float>(plane, pointsNear, 0.1f)) {
+                if (estiPlane(plane, pointsNear, 0.1f)) {
                     const float pd2 = plane(0) * pointWorld.x
                         + plane(1) * pointWorld.y
                         + plane(2) * pointWorld.z

@@ -156,7 +156,7 @@ TEST(LioMath, PlaneFit) {
         points[static_cast<size_t>(i)].z = 1.0f;
     }
     Eigen::Matrix<float, 4, 1> plane;
-    EXPECT_TRUE(arc::estiPlane<float>(plane, points, 0.1f));
+    EXPECT_TRUE(arc::estiPlane(plane, points, 0.1f));
     EXPECT_NEAR(std::fabs(plane(2)), 1.0f, 1e-5f);
 }
 

@@ -14,17 +14,16 @@ inline float calcDist(const LioPoint& p1, const LioPoint& p2) {
         + (p1.z - p2.z) * (p1.z - p2.z);
 }
 
-template <typename T>
 inline bool estiPlane(
-    Eigen::Matrix<T, 4, 1>& plane,
+    Eigen::Matrix<float, 4, 1>& plane,
     const LioPointVector& points,
-    const T& threshold
+    float threshold
 ) {
-    Eigen::Matrix<T, kNumMatchPoints, 3> a;
-    Eigen::Matrix<T, kNumMatchPoints, 1> b;
+    Eigen::Matrix<float, kNumMatchPoints, 3> a;
+    Eigen::Matrix<float, kNumMatchPoints, 1> b;
     a.setZero();
     b.setOnes();
-    b *= T(-1);
+    b *= -1.0f;
 
     for (int j = 0; j < kNumMatchPoints; ++ j) {
         a(j, 0) = points[j].x;
@@ -32,12 +31,12 @@ inline bool estiPlane(
         a(j, 2) = points[j].z;
     }
 
-    const Eigen::Matrix<T, 3, 1> norm = a.colPivHouseholderQr().solve(b);
-    const T length = norm.norm();
+    const Eigen::Matrix<float, 3, 1> norm = a.colPivHouseholderQr().solve(b);
+    const float length = norm.norm();
     plane(0) = norm(0) / length;
     plane(1) = norm(1) / length;
     plane(2) = norm(2) / length;
-    plane(3) = T(1) / length;
+    plane(3) = 1.0f / length;
 
     for (int j = 0; j < kNumMatchPoints; ++ j) {
         if (std::fabs(
@@ -51,22 +50,21 @@ inline bool estiPlane(
     return true;
 }
 
-template <typename T>
 inline ImuPose setPose6D(
     double time,
-    const Eigen::Matrix<T, 3, 1>& acc,
-    const Eigen::Matrix<T, 3, 1>& gyr,
-    const Eigen::Matrix<T, 3, 1>& vel,
-    const Eigen::Matrix<T, 3, 1>& pos,
-    const Eigen::Matrix<T, 3, 3>& rot
+    const Vec3d& acc,
+    const Vec3d& gyr,
+    const Vec3d& vel,
+    const Vec3d& pos,
+    const Mat3d& rot
 ) {
     ImuPose pose;
     pose.offsetTime = time;
-    pose.acc = acc.template cast<double>();
-    pose.gyr = gyr.template cast<double>();
-    pose.vel = vel.template cast<double>();
-    pose.pos = pos.template cast<double>();
-    pose.rot = rot.template cast<double>();
+    pose.acc = acc;
+    pose.gyr = gyr;
+    pose.vel = vel;
+    pose.pos = pos;
+    pose.rot = rot;
     return pose;
 }
 

@@ -58,19 +58,15 @@ public:
 
         s2State_.push_back({21, 21});
     }
-
     const std::vector<VectorState>& vectorState() const {
         return vectorState_;
     }
-
     const std::vector<MatrixState>& so3State() const {
         return so3State_;
     }
-
     const std::vector<MatrixState>& s2State() const {
         return s2State_;
     }
-
     void boxPlus(const Eigen::Matrix<double, DOF, 1>& delta, double scale = 1.0) {
         pos.boxPlus(delta.segment<3>(0), scale);
         rot.boxPlus(delta.segment<3>(3), scale);
