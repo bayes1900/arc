@@ -17,19 +17,15 @@ public:
     {
         tree_->setDownsampleParam(static_cast<float>(config_.filterSizeMap));
     }
-
     bool empty() const {
         return tree_->root_ == nullptr;
     }
-
     void setDownsampleParam(double size) {
         tree_->setDownsampleParam(static_cast<float>(size));
     }
-
     void build(const LioPointVector& points) {
         tree_->build(points);
     }
-
     void segmentFov(const Vec3d& positionLidar) {
         cubNeedRemove_.clear();
 
@@ -43,7 +39,6 @@ public:
             localMapInitialized_ = true;
             return;
         }
-
         const double detectRange = config_.detRange;
         bool needMove = false;
         double distToEdge[3][2];
@@ -58,12 +53,11 @@ public:
         if (!needMove) {
             return;
         }
-
         BoxPointType newLocalMap = localMapPoints_;
         const double moveDist = std::max(
             (config_.cubeSideLength - 2.0 * MOV_THRESHOLD * detectRange) * 0.5 * 0.9,
-            detectRange * (MOV_THRESHOLD - 1.0));
-
+            detectRange * (MOV_THRESHOLD - 1.0)
+        );
         for (int i = 0; i < 3; ++ i) {
             BoxPointType removedBox = localMapPoints_;
             if (distToEdge[i][0] <= MOV_THRESHOLD * detectRange) {
@@ -84,7 +78,6 @@ public:
             tree_->deletePointBoxes(cubNeedRemove_);
         }
     }
-
     int nearestSearch(
         const LioPoint& point,
         int k,
@@ -94,27 +87,21 @@ public:
         tree_->nearestSearch(point, k, nearest, squaredDistances);
         return static_cast<int>(nearest.size());
     }
-
     int addPoints(LioPointVector& points, bool downsampleOn) {
         return tree_->addPoints(points, downsampleOn);
     }
-
     int deletePointBoxes(std::vector<BoxPointType>& boxes) {
         return tree_->deletePointBoxes(boxes);
     }
-
     int size() {
         return tree_->size();
     }
-
     int validNum() {
         return tree_->validNum();
     }
-
     void flatten(LioPointVector& storage) {
         tree_->flatten(tree_->root_, storage, DeleteStorage::NOT_RECORD);
     }
-
     void acquireRemovedPoints(LioPointVector& points) {
         tree_->acquireRemovedPoints(points);
     }

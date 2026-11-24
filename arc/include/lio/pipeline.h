@@ -5,7 +5,6 @@
 #include <lio/lioconfig.h>
 #include <lio/liotypes.h>
 #include <lio/preprocessor.h>
-
 #include <condition_variable>
 #include <thread>
 
@@ -18,11 +17,9 @@ public:
         , estimator_(config)
         , preprocessor_(config)
     {}
-
     ~LioPipeline() {
         stop();
     }
-
     LioPipeline(const LioPipeline&) = delete;
     LioPipeline& operator=(const LioPipeline&) = delete;
 
@@ -34,7 +31,6 @@ public:
         running_ = true;
         worker_ = std::thread([this]() { run_(); });
     }
-
     void stop() {
         {
             std::lock_guard<std::mutex> lock(mutex_);
@@ -45,7 +41,6 @@ public:
             worker_.join();
         }
     }
-
     void addLidar(LidarFrame frame) {
         {
             std::lock_guard<std::mutex> lock(mutex_);
@@ -62,7 +57,6 @@ public:
         }
         condition_.notify_all();
     }
-
     void addImu(const ImuSample& imu) {
         {
             std::lock_guard<std::mutex> lock(mutex_);
@@ -78,7 +72,6 @@ public:
         }
         condition_.notify_all();
     }
-
     bool getOutput(LioOutput& output) {
         std::lock_guard<std::mutex> lock(outputMutex_);
         if (!hasOutput_) {
@@ -120,7 +113,6 @@ private:
                 }
                 lidarBuffer_.pop_front();
             }
-
             try {
                 preprocessor_.process(frame, *measurement.lidar);
             } catch (const std::exception& error) {
@@ -138,7 +130,6 @@ private:
             if (!processed) {
                 continue;
             }
-
             LioOutput output;
             output.valid = true;
             output.stamp = measurement.lidarEndTime;
@@ -147,7 +138,6 @@ private:
             output.velocity = estimator_.velocity();
             output.covariance = estimator_.covariance();
             output.cloud = estimator_.registeredCloud();
-
             {
                 std::lock_guard<std::mutex> lock(outputMutex_);
                 output_ = std::move(output);

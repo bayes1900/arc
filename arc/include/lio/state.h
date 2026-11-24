@@ -13,8 +13,6 @@ using LioS2 = manifold::ManifoldS2<double, 98090, 10000, 1>;
 
 class LioState {
 public:
-    using Scalar = double;
-
     static constexpr int DOF = 23;
     static constexpr int DIM = 24;
 
@@ -23,7 +21,6 @@ public:
         int dimension;
         int dof;
     };
-
     struct MatrixState {
         int index;
         int dimension;
@@ -41,21 +38,17 @@ public:
     LioState() {
         buildStateIndex();
     }
-
     void buildStateIndex() {
         vectorState_.clear();
         so3State_.clear();
         s2State_.clear();
-
         vectorState_.push_back({0, 0, 3});
         vectorState_.push_back({9, 9, 3});
         vectorState_.push_back({12, 12, 3});
         vectorState_.push_back({15, 15, 3});
         vectorState_.push_back({18, 18, 3});
-
         so3State_.push_back({3, 3});
         so3State_.push_back({6, 6});
-
         s2State_.push_back({21, 21});
     }
     const std::vector<VectorState>& vectorState() const {
@@ -77,11 +70,9 @@ public:
         ba.boxPlus(delta.segment<3>(18), scale);
         grav.boxPlus(delta.segment<2>(21), scale);
     }
-
     void boxMinus(Eigen::Matrix<double, DOF, 1>& result, const LioState& other) const {
         Eigen::Matrix<double, 3, 1> vectorDelta;
         Eigen::Matrix<double, 2, 1> sphereDelta;
-
         pos.boxMinus(vectorDelta, other.pos);
         result.segment<3>(0) = vectorDelta;
         rot.boxMinus(vectorDelta, other.rot);
@@ -99,7 +90,6 @@ public:
         grav.boxMinus(sphereDelta, other.grav);
         result.segment<2>(21) = sphereDelta;
     }
-
     void oPlus(const Eigen::Matrix<double, DIM, 1>& delta, double scale = 1.0) {
         pos.oPlus(delta.segment<3>(0), scale);
         rot.oPlus(delta.segment<3>(3), scale);
@@ -110,22 +100,15 @@ public:
         ba.oPlus(delta.segment<3>(18), scale);
         grav.oPlus(delta.segment<3>(21), scale);
     }
-
     void s2Hat(Eigen::Matrix<double, 3, 3>& result, int index) const {
         (void)index;
         grav.s2Hat(result);
     }
-
     void s2NxYy(Eigen::Matrix<double, 2, 3>& result, int index) const {
         (void)index;
         grav.s2NxYy(result);
     }
-
-    void s2Mx(
-        Eigen::Matrix<double, 3, 2>& result,
-        const Eigen::Matrix<double, 2, 1>& delta,
-        int index
-    ) const {
+    void s2Mx(Eigen::Matrix<double, 3, 2>& result, const Eigen::Matrix<double, 2, 1>& delta, int index) const {
         (void)index;
         grav.s2Mx(result, delta);
     }
@@ -138,8 +121,6 @@ private:
 
 class LioInput {
 public:
-    using Scalar = double;
-
     static constexpr int DOF = 6;
     static constexpr int DIM = 6;
 
@@ -173,12 +154,9 @@ inline Eigen::Matrix<double, 24, 1> lioGetF(LioState& state, const LioInput& inp
 inline Eigen::Matrix<double, 24, 23> lioDfDx(LioState& state, const LioInput& input) {
     Eigen::Matrix<double, 24, 23> covariance = Eigen::Matrix<double, 24, 23>::Zero();
     covariance.block<3, 3>(0, 12) = Eigen::Matrix3d::Identity();
-
     const LioVect3 acc = input.acc - state.ba;
-    covariance.block<3, 3>(12, 3) =
-        -state.rot.toRotationMatrix() * manifold::hat<double>(acc);
+    covariance.block<3, 3>(12, 3) = -state.rot.toRotationMatrix() * manifold::hat<double>(acc);
     covariance.block<3, 3>(12, 18) = -state.rot.toRotationMatrix();
-
     const Eigen::Matrix<double, 2, 1> zero = Eigen::Matrix<double, 2, 1>::Zero();
     Eigen::Matrix<double, 3, 2> gravityMatrix;
     state.s2Mx(gravityMatrix, zero, 21);
