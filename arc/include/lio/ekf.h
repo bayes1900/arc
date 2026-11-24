@@ -71,7 +71,7 @@ public:
             // identity rotation for numerical parity with upstream.
             const manifold::ManifoldSo3<Scalar> rotation = manifold::ManifoldSo3<Scalar>::exp(segment, Scalar(0));
             fX1.block<3, 3>(entry.index, entry.index) = rotation.toRotationMatrix();
-            const Eigen::Matrix<Scalar, 3, 3> a = manifold::aMatrix(segment);
+            const Eigen::Matrix<Scalar, 3, 3> a = manifold::leftJacobianSO3(segment);
             for (int i = 0; i < STATE_DOF; ++ i) {
                 fXFinal.block<3, 1>(entry.index, i) = a * fX.block<3, 1>(entry.dimension, i);
             }
@@ -95,7 +95,7 @@ public:
 
             Eigen::Matrix<Scalar, 3, 3> beforeHat;
             stateBefore.s2Hat(beforeHat, entry.index);
-            const Eigen::Matrix<Scalar, 2, 3> residual = -nx * rotation.toRotationMatrix() * beforeHat * manifold::aMatrix(segment).transpose();
+            const Eigen::Matrix<Scalar, 2, 3> residual = -nx * rotation.toRotationMatrix() * beforeHat * manifold::leftJacobianSO3(segment).transpose();
             for (int i = 0; i < STATE_DOF; ++ i) {
                 fXFinal.block<2, 1>(entry.index, i) = residual * fX.block<3, 1>(entry.dimension, i);
             }
@@ -136,7 +136,7 @@ public:
                 for (int i = 0; i < 3; ++ i) {
                     segment(i) = dx(entry.index + i);
                 }
-                const Eigen::Matrix<Scalar, 3, 3> reparameterization = manifold::aMatrix(segment).transpose();
+                const Eigen::Matrix<Scalar, 3, 3> reparameterization = manifold::leftJacobianSO3(segment).transpose();
                 dxNew.block<3, 1>(entry.index, 0) = reparameterization * dxNew.block<3, 1>(entry.index, 0);
                 for (int i = 0; i < STATE_DOF; ++ i) {
                     covariance_.block<3, 1>(entry.index, i) = reparameterization * covariance_.block<3, 1>(entry.index, i);
@@ -205,7 +205,7 @@ public:
                         segment(i) = dxCorrection(entry.index + i);
                     }
                     const Eigen::Matrix<Scalar, 3, 3> reparameterization =
-                        manifold::aMatrix(segment).transpose();
+                        manifold::leftJacobianSO3(segment).transpose();
                     for (int i = 0; i < STATE_DOF; ++ i) {
                         l.block<3, 1>(entry.index, i) = reparameterization * covariance_.block<3, 1>(entry.index, i);
                     }

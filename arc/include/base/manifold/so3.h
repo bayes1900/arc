@@ -9,6 +9,15 @@
 namespace arc {
 namespace manifold {
 
+template <typename Scalar>
+class ManifoldSo3;
+
+template <typename Scalar>
+inline ManifoldSo3<Scalar> expSO3(const Eigen::Matrix<Scalar, 3, 1>& omega, Scalar scale = Scalar(1));
+
+template <typename Scalar>
+inline Eigen::Matrix<Scalar, 3, 1> logSO3(const ManifoldSo3<Scalar>& orientation);
+
 template <typename Scalar = double>
 class ManifoldSo3 : public Sophus::SO3<Scalar> {
 public:
@@ -74,6 +83,19 @@ public:
         *this = ManifoldSo3(self * static_cast<const Base&>(exp(delta, scale)));
     }
 };
+
+// Free-function aliases over ManifoldSo3::exp/log.
+// The implementation stays in ManifoldSo3 to preserve the upstream
+// Taylor/quaternion path and the filter-critical scale semantics.
+template <typename Scalar>
+inline ManifoldSo3<Scalar> expSO3(const Eigen::Matrix<Scalar, 3, 1>& omega, Scalar scale) {
+    return ManifoldSo3<Scalar>::exp(omega, scale);
+}
+
+template <typename Scalar>
+inline Eigen::Matrix<Scalar, 3, 1> logSO3(const ManifoldSo3<Scalar>& orientation) {
+    return ManifoldSo3<Scalar>::log(orientation);
+}
 
 } // manifold
 } // arc

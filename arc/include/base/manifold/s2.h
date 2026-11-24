@@ -127,7 +127,7 @@ public:
         // FAST_LIO passes scalar(1/2), which evaluates to integer zero. Keep
         // the identity rotation for numerical parity with upstream.
         const ManifoldSo3<Scalar> rotation = ManifoldSo3<Scalar>::exp(bu, Scalar(0));
-        result = -rotation.toRotationMatrix() * hat<Scalar>(vec) * aMatrix<Scalar>(bu).transpose() * bx;
+        result = -rotation.toRotationMatrix() * hat<Scalar>(vec) * leftJacobianSO3<Scalar>(bu).transpose() * bx;
     }
     operator const Vector&() const {
         return vec;

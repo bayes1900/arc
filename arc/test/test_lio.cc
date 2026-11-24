@@ -107,6 +107,19 @@ TEST(LioMath, So3ExpMatchesAngleAxis) {
     EXPECT_TRUE(rotation.isApprox(expected, 1e-9));
 }
 
+TEST(LioMath, So3ExpLogRoundTrip) {
+    const Eigen::Vector3d omega(0.1, -0.2, 0.3);
+    const auto rotation = arc::manifold::expSO3(omega);
+    const Eigen::Vector3d recovered = arc::manifold::logSO3(rotation);
+    EXPECT_TRUE(recovered.isApprox(omega, 1e-9));
+}
+
+TEST(LioMath, So3LeftJacobianAlias) {
+    const Eigen::Vector3d phi(0.1, -0.2, 0.3);
+    EXPECT_TRUE(arc::manifold::leftJacobianSO3(phi).isApprox(
+        arc::manifold::aMatrix(phi), 1e-12));
+}
+
 TEST(LioManifold, So3BoxPlusMinus) {
     const Eigen::Vector3d delta(0.02, -0.01, 0.03);
     arc::manifold::ManifoldSo3<double> orientation;
