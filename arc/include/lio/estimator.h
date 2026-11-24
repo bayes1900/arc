@@ -7,7 +7,7 @@
 #include <lio/mapmanager.h>
 #include <base/manifold/math.h>
 #include <lio/geometry.h>
-#include <lio/filter.h>
+#include <lio/ekf.h>
 
 #include <pcl/filters/voxel_grid.h>
 #include <pcl/filters/impl/filter.hpp>
@@ -29,11 +29,11 @@ public:
         downsampleSurf_.setLeafSize(
             static_cast<float>(config_.filterSizeSurf),
             static_cast<float>(config_.filterSizeSurf),
-            static_cast<float>(config_.filterSizeSurf));
+            static_cast<float>(config_.filterSizeSurf)
+        );
         initEkf_();
         state_ = kf_.state();
     }
-
     bool process(const MeasurementGroup& meas) {
         lidarEndTime_ = meas.lidarEndTime;
         if (flgFirstScan_) {
@@ -41,7 +41,6 @@ public:
             flgFirstScan_ = false;
             return false;
         }
-
         imuProcessor_.process(meas, kf_, *featsUndistort_);
         state_ = kf_.state();
         posLid_ = state_.pos + state_.rot * state_.offsetTLI;
@@ -50,7 +49,6 @@ public:
             std::cerr << "[lio] No point, skip this scan" << std::endl;
             return false;
         }
-
         flgEKFInited_ = (meas.lidarBeginTime - firstLidarTime_) >= INIT_TIME;
         map_.segmentFov(posLid_);
 
@@ -70,12 +68,10 @@ public:
             }
             return false;
         }
-
         if (featsDownSize_ < 5) {
             std::cerr << "[lio] No point, skip this scan" << std::endl;
             return false;
         }
-
         normvec_->resize(static_cast<size_t>(featsDownSize_));
         featsDownWorld_->resize(static_cast<size_t>(featsDownSize_));
         nearestPoints_.resize(static_cast<size_t>(featsDownSize_));
@@ -90,31 +86,24 @@ public:
         mapIncremental_();
         return true;
     }
-
     const LioState& state() const {
         return state_;
     }
-
     MatXd covariance() const {
         return kf_.covariance();
     }
-
     Vec3d position() const {
         return state_.pos;
     }
-
     Mat3d rotation() const {
         return state_.rot.toRotationMatrix();
     }
-
     Vec3d velocity() const {
         return state_.vel;
     }
-
     double lidarEndTime() const {
         return lidarEndTime_;
     }
-
     LioCloud::Ptr registeredCloud() const {
         auto cloud = std::make_shared<LioCloud>();
         cloud->resize(featsUndistort_->size());

@@ -5,7 +5,7 @@
 #include <lio/liotypes.h>
 #include <base/manifold/math.h>
 #include <lio/geometry.h>
-#include <lio/filter.h>
+#include <lio/ekf.h>
 
 namespace arc {
 

@@ -6,7 +6,7 @@
 #include <lio/lioconfig.h>
 #include <lio/geometry.h>
 #include <lio/state.h>
-#include <lio/filter.h>
+#include <lio/ekf.h>
 #include <lio/preprocessor.h>
 #include <lio/imuprocessor.h>
 #include <lio/mapmanager.h>
