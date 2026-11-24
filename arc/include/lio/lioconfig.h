@@ -2,23 +2,18 @@
 
 #include <base/base.h>
 #include <lio/liotypes.h>
-
 #include <yaml-cpp/yaml.h>
 
 namespace arc {
 
 struct LioConfig {
-    static LioConfig loadConfig(const std::string& path) {
-        return configFromYaml_(YAML::LoadFile(path));
-    }
-
     LidarType lidarType{LidarType::Generic};
     int scanLine{16};
     int scanRate{10};
     int pointFilterNum{1};
     int timestampUnit{2};
     double blind{0.01};
-    bool featureExtractEnable{false};
+    double blindSq{0.01 * 0.01};
 
     int maxIterations{4};
     double filterSizeSurf{0.5};
@@ -44,11 +39,11 @@ struct LioConfig {
     bool publishScanBody{false};
     int publishFramePeriod{20};
 
-private:
-    static bool has_(const YAML::Node& node, const char* key) {
-        return node && node[key];
+    static LioConfig loadConfig(const std::string& path) {
+        return configFromYaml_(YAML::LoadFile(path));
     }
 
+private:
     static double yamlOrAny_(const YAML::Node& node, const char* key, double defaultValue) {
         if (!node || !node[key]) {
             return defaultValue;
@@ -59,7 +54,6 @@ private:
             return defaultValue;
         }
     }
-
     static int yamlOrAny_(const YAML::Node& node, const char* key, int defaultValue) {
         if (!node || !node[key]) {
             return defaultValue;
@@ -70,7 +64,6 @@ private:
             return defaultValue;
         }
     }
-
     static bool yamlOrAny_(const YAML::Node& node, const char* key, bool defaultValue) {
         if (!node || !node[key]) {
             return defaultValue;
@@ -81,7 +74,6 @@ private:
             return defaultValue;
         }
     }
-
     static LidarType lidarTypeFrom_(const YAML::Node& node, LidarType defaultValue) {
         if (!node) {
             return defaultValue;
@@ -109,7 +101,6 @@ private:
         }
         return LidarType::Generic;
     }
-
     static Vec3d vec3From_(const YAML::Node& node, const Vec3d& defaultValue) {
         if (!node) {
             return defaultValue;
@@ -123,7 +114,6 @@ private:
         }
         return defaultValue;
     }
-
     static Mat3d mat3From_(const YAML::Node& node, const Mat3d& defaultValue) {
         if (!node) {
             return defaultValue;
@@ -141,78 +131,44 @@ private:
         }
         return defaultValue;
     }
-
     static LioConfig configFromYaml_(const YAML::Node& root) {
         const YAML::Node node = root["lio"] ? root["lio"] : root;
-        const YAML::Node preprocess = node["preprocess"] ? node["preprocess"] : YAML::Node();
         const YAML::Node mapping = node["mapping"] ? node["mapping"] : node;
 
         LioConfig config;
 
-        const YAML::Node lidarTypeNode = has_(node, "lidarType") ? node["lidarType"] : preprocess["lidar_type"];
-        config.lidarType = lidarTypeFrom_(lidarTypeNode, config.lidarType);
-        config.scanLine = yamlOrAny_(node, "scanLine",
-            yamlOrAny_(preprocess, "scan_line", config.scanLine));
-        config.scanRate = yamlOrAny_(node, "scanRate",
-            yamlOrAny_(preprocess, "scan_rate", config.scanRate));
-        config.pointFilterNum = yamlOrAny_(node, "pointFilterNum",
-            yamlOrAny_(preprocess, "point_filter_num", config.pointFilterNum));
-        config.timestampUnit = yamlOrAny_(node, "timestampUnit",
-            yamlOrAny_(preprocess, "timestamp_unit", config.timestampUnit));
-        config.blind = yamlOrAny_(node, "blind",
-            yamlOrAny_(preprocess, "blind", config.blind));
-        config.featureExtractEnable = yamlOrAny_(node, "featureExtractEnable",
-            yamlOrAny_(node, "feature_extract_enable",
-                yamlOrAny_(preprocess, "feature_extract_enable", config.featureExtractEnable)));
+        config.lidarType = lidarTypeFrom_(node["lidarType"], config.lidarType);
+        config.scanLine = yamlOrAny_(node, "scanLine", config.scanLine);
+        config.scanRate = yamlOrAny_(node, "scanRate", config.scanRate);
+        config.pointFilterNum = yamlOrAny_(node, "pointFilterNum", config.pointFilterNum);
+        config.timestampUnit = yamlOrAny_(node, "timestampUnit", config.timestampUnit);
+        config.blind = yamlOrAny_(node, "blind", config.blind);
+        config.blindSq = config.blind * config.blind;
 
-        config.maxIterations = yamlOrAny_(node, "maxIterations",
-            yamlOrAny_(node, "max_iteration", config.maxIterations));
-        config.filterSizeSurf = yamlOrAny_(node, "filterSizeSurf",
-            yamlOrAny_(node, "filter_size_surf", config.filterSizeSurf));
-        config.filterSizeMap = yamlOrAny_(node, "filterSizeMap",
-            yamlOrAny_(node, "filter_size_map", config.filterSizeMap));
-        config.cubeSideLength = yamlOrAny_(node, "cubeSideLength",
-            yamlOrAny_(node, "cube_side_length", config.cubeSideLength));
-        config.detRange = yamlOrAny_(mapping, "detRange",
-            yamlOrAny_(mapping, "det_range", config.detRange));
-        config.fovDegree = yamlOrAny_(mapping, "fovDegree",
-            yamlOrAny_(mapping, "fov_degree", config.fovDegree));
+        config.maxIterations = yamlOrAny_(node, "maxIterations", config.maxIterations);
+        config.filterSizeSurf = yamlOrAny_(node, "filterSizeSurf", config.filterSizeSurf);
+        config.filterSizeMap = yamlOrAny_(node, "filterSizeMap", config.filterSizeMap);
+        config.cubeSideLength = yamlOrAny_(node, "cubeSideLength", config.cubeSideLength);
+        config.detRange = yamlOrAny_(mapping, "detRange", config.detRange);
+        config.fovDegree = yamlOrAny_(mapping, "fovDegree", config.fovDegree);
 
-        config.accCov = yamlOrAny_(mapping, "accCov",
-            yamlOrAny_(mapping, "acc_cov", config.accCov));
-        config.gyrCov = yamlOrAny_(mapping, "gyrCov",
-            yamlOrAny_(mapping, "gyr_cov", config.gyrCov));
-        config.biasAccCov = yamlOrAny_(mapping, "biasAccCov",
-            yamlOrAny_(mapping, "b_acc_cov", config.biasAccCov));
-        config.biasGyrCov = yamlOrAny_(mapping, "biasGyrCov",
-            yamlOrAny_(mapping, "b_gyr_cov", config.biasGyrCov));
-        config.extrinsicEstimate = yamlOrAny_(mapping, "extrinsicEstimate",
-            yamlOrAny_(mapping, "extrinsic_est_en", config.extrinsicEstimate));
-        config.extrinsicT = vec3From_(
-            has_(mapping, "extrinsicT") ? mapping["extrinsicT"] : mapping["extrinsic_T"],
-            config.extrinsicT);
-        config.extrinsicR = mat3From_(
-            has_(mapping, "extrinsicR") ? mapping["extrinsicR"] : mapping["extrinsic_R"],
-            config.extrinsicR);
+        config.accCov = yamlOrAny_(mapping, "accCov", config.accCov);
+        config.gyrCov = yamlOrAny_(mapping, "gyrCov", config.gyrCov);
+        config.biasAccCov = yamlOrAny_(mapping, "biasAccCov", config.biasAccCov);
+        config.biasGyrCov = yamlOrAny_(mapping, "biasGyrCov", config.biasGyrCov);
+        config.extrinsicEstimate = yamlOrAny_(mapping, "extrinsicEstimate", config.extrinsicEstimate);
+        config.extrinsicT = vec3From_(mapping["extrinsicT"], config.extrinsicT);
+        config.extrinsicR = mat3From_(mapping["extrinsicR"], config.extrinsicR);
 
-        config.timeSyncEnable = yamlOrAny_(node, "timeSyncEnable",
-            yamlOrAny_(node, "time_sync_en", config.timeSyncEnable));
-        config.timeOffsetLidarToImu = yamlOrAny_(node, "timeOffsetLidarToImu",
-            yamlOrAny_(node, "time_offset_lidar_to_imu", config.timeOffsetLidarToImu));
+        config.timeSyncEnable = yamlOrAny_(node, "timeSyncEnable", config.timeSyncEnable);
+        config.timeOffsetLidarToImu = yamlOrAny_(node, "timeOffsetLidarToImu", config.timeOffsetLidarToImu);
 
-        config.publishPath = yamlOrAny_(node, "publishPath",
-            yamlOrAny_(node, "path_en", config.publishPath));
-        config.publishScan = yamlOrAny_(node, "publishScan",
-            yamlOrAny_(node, "scan_publish_en", config.publishScan));
-        config.publishDense = yamlOrAny_(node, "publishDense",
-            yamlOrAny_(node, "dense_publish_en", config.publishDense));
-        config.publishScanBody = yamlOrAny_(node, "publishScanBody",
-            yamlOrAny_(node, "scan_bodyframe_pub_en", config.publishScanBody));
-        config.publishFramePeriod = yamlOrAny_(node, "publishFramePeriod",
-            yamlOrAny_(node, "publish_frame_period", config.publishFramePeriod));
+        config.publishPath = yamlOrAny_(node, "publishPath", config.publishPath);
+        config.publishScan = yamlOrAny_(node, "publishScan", config.publishScan);
+        config.publishDense = yamlOrAny_(node, "publishDense", config.publishDense);
+        config.publishScanBody = yamlOrAny_(node, "publishScanBody", config.publishScanBody);
+        config.publishFramePeriod = yamlOrAny_(node, "publishFramePeriod", config.publishFramePeriod);
 
-        ensure(!config.featureExtractEnable,
-            "feature_extract_enable is not ported; use the raw-point FAST-LIO2 path");
         return config;
     }
 };

@@ -8,35 +8,33 @@ namespace arc {
 
 class PointPreprocessor {
 public:
-    explicit PointPreprocessor(const LioConfig& config)
-        : config_(config)
-    {
-        ensure(!config_.featureExtractEnable,
-            "feature extraction is not ported; use the raw-point path");
-        ensure(config_.lidarType != LidarType::Avia,
-            "Livox CustomMsg is handled by the ROS node adapter, not the core preprocessor");
+    explicit PointPreprocessor(const LioConfig& config) : config_(config) {
+        config_.blindSq = config_.blind * config_.blind;
+        ensure(config_.lidarType != LidarType::Avia, "Livox CustomMsg is handled by the ROS node adapter, not the core preprocessor");
     }
-
     void process(const LidarFrame& frame, LioCloud& output) {
         output.clear();
         if (frame.points.empty()) {
             return;
         }
         switch (config_.lidarType) {
-            case LidarType::Sim:
+            case LidarType::Sim: {
                 processSim_(frame, output);
                 break;
+            }
             case LidarType::Generic:
-            case LidarType::Ouster:
+            case LidarType::Ouster: {
                 if (frame.hasTime) {
                     processTimed_(frame, output);
                 } else {
                     processUntimed_(frame, output);
                 }
                 break;
-            case LidarType::Avia:
-                ensure(false, "Avia raw points must be converted by the node adapter");
+            }
+            default: {
+                throw std::runtime_error("Invalid lidarType");
                 break;
+            }
         }
     }
 
@@ -60,13 +58,11 @@ private:
             output.push_back(added);
         }
     }
-
     void processUntimed_(const LidarFrame& frame, LioCloud& output) {
         const int scanLine = std::max(config_.scanLine, 1);
-        std::vector<bool> isFirst(static_cast<size_t>(scanLine), true);
-        std::vector<double> yawFirst(static_cast<size_t>(scanLine), 0.0);
-        std::vector<double> yawLast(static_cast<size_t>(scanLine), 0.0);
-        std::vector<double> timeLast(static_cast<size_t>(scanLine), 0.0);
+        std::vector<bool> isFirst(scanLine, true);
+        std::vector<double> yawFirst(scanLine, 0.0);
+        std::vector<double> timeLast(scanLine, 0.0);
         const double omega = std::max(config_.scanRate, 1) * 360.0;
 
         output.reserve(frame.points.size());
@@ -84,7 +80,6 @@ private:
             float pointTime = 0.0f;
             if (isFirst[static_cast<size_t>(layer)]) {
                 yawFirst[static_cast<size_t>(layer)] = yaw;
-                yawLast[static_cast<size_t>(layer)] = yaw;
                 timeLast[static_cast<size_t>(layer)] = 0.0;
                 isFirst[static_cast<size_t>(layer)] = false;
                 continue;
@@ -98,7 +93,6 @@ private:
             if (pointTime < timeLast[static_cast<size_t>(layer)]) {
                 pointTime += static_cast<float>(360.0 / omega);
             }
-            yawLast[static_cast<size_t>(layer)] = yaw;
             timeLast[static_cast<size_t>(layer)] = pointTime;
 
             if (config_.pointFilterNum > 1 && static_cast<int>(i) % config_.pointFilterNum != 0) {
@@ -117,7 +111,6 @@ private:
             output.push_back(added);
         }
     }
-
     void processSim_(const LidarFrame& frame, LioCloud& output) {
         output.reserve(frame.points.size());
         for (const LidarPoint& point : frame.points) {
@@ -133,19 +126,17 @@ private:
             output.push_back(added);
         }
     }
-
     bool validPoint_(const LidarPoint& point) const {
         if (!std::isfinite(point.x) || !std::isfinite(point.y) || !std::isfinite(point.z)) {
             return false;
         }
         return validRange_(point);
     }
-
     bool validRange_(const LidarPoint& point) const {
         const double range2 = static_cast<double>(point.x) * point.x
             + static_cast<double>(point.y) * point.y
             + static_cast<double>(point.z) * point.z;
-        return range2 > config_.blind * config_.blind;
+        return range2 > config_.blindSq;
     }
 
 private:
