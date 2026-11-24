@@ -1,7 +1,6 @@
 #pragma once
 
 #include <base/ros.h>
-
 #include <base/iarc.h>
 
 namespace arc {

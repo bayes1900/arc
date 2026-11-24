@@ -1,9 +1,6 @@
 #pragma once
 
-// Incremental kd-tree, adapted from HKU-MARS ikd-Tree.
-
 #include <base/base.h>
-
 #include <pthread.h>
 #include <unistd.h>
 
@@ -1619,7 +1616,7 @@ void KdTree<PointType>::searchByRadius_(KdTreeNode *root, PointType point, float
     range_center.z = (root->node_range_z[0] + root->node_range_z[1]) * 0.5;
     float dist = std::sqrt(calcDist_(range_center, point));
     if (dist > radius + std::sqrt(root->radius_sq)) return;
-    if (dist <= radius - std::sqrt(root->radius_sq)) 
+    if (dist <= radius - std::sqrt(root->radius_sq))
     {
         flatten(root, storage, DeleteStorage::NOT_RECORD);
         return;
@@ -1646,7 +1643,7 @@ void KdTree<PointType>::searchByRadius_(KdTreeNode *root, PointType point, float
         pthread_mutex_lock(&searchFlagMutex_);
         searchByRadius_(root->right_son_ptr, point, radius, storage);
         pthread_mutex_unlock(&searchFlagMutex_);
-    }    
+    }
     return;
 }
 
